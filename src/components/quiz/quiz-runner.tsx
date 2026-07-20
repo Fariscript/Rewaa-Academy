@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCountdown, remainingSeconds } from "@/lib/quiz/countdown";
 import { BUTTON_CLASSES } from "@/components/ui/button";
@@ -30,83 +30,133 @@ export interface RunnerAttempt {
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 const AUTO_GRADED = new Set(["MCQ", "TRUE_FALSE"]);
+const RETRY_DELAY_MS = 5000;
 
 export function QuizRunner({ attempt }: { attempt: RunnerAttempt }) {
   const router = useRouter();
 
-  // T-32: the countdown is display-only and follows the SERVER clock — at
-  // mount we compute the client↔server skew from serverNow and render
-  // expiresAt through it. Actual expiry is enforced server-side
-  // (syncExpiry); when the display hits zero we just submit, and the server
-  // idempotently auto-submits whatever was saved even if this tab never
-  // does.
-  const clockSkewMs = useMemo(() => new Date(attempt.serverNow).getTime() - Date.now(), [attempt.serverNow]);
-  const expiresAt = useMemo(() => new Date(attempt.expiresAt), [attempt.expiresAt]);
-  const serverNow = useCallback(() => new Date(Date.now() + clockSkewMs), [clockSkewMs]);
-
-  const [remaining, setRemaining] = useState(() => remainingSeconds(expiresAt, serverNow()));
+  // T-32: the countdown is display-only and follows the SERVER clock. The
+  // initial value is pure (props only); the client↔server skew is measured
+  // inside the tick effect, where impure reads are allowed. Actual expiry
+  // is enforced server-side (syncExpiry) — when the display hits zero we
+  // just submit, and the server idempotently auto-submits whatever was
+  // saved even if this tab never does.
+  const [remaining, setRemaining] = useState(() =>
+    remainingSeconds(new Date(attempt.expiresAt), new Date(attempt.serverNow)),
+  );
   const [answers, setAnswers] = useState<RunnerAnswer[]>(attempt.answers);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const answersRef = useRef(answers);
-  answersRef.current = answers;
+  const answersRef = useRef(attempt.answers);
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
   const dirtyRef = useRef(false);
   const submittedRef = useRef(false);
+  const submitBusyRef = useRef(false);
+  // The attempt was finalized server-side mid-edit (PATCH answered 403,
+  // e.g. the timer ran out in another tab) — nothing more can be saved.
+  const attemptClosedRef = useRef(false);
+  // All persists run through one promise chain so PATCHes never overlap —
+  // an older in-flight payload can't land after (and clobber) a newer one.
+  const persistChainRef = useRef<Promise<void>>(Promise.resolve());
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Lets the failure-retry timeout call back into persist without the
+  // callback referencing itself.
+  const retryPersistRef = useRef<() => void>(() => {});
 
-  const persist = useCallback(async () => {
-    if (!dirtyRef.current || submittedRef.current) return;
-    dirtyRef.current = false;
-    setSaveState("saving");
-    try {
-      const payload = answersRef.current
-        .filter((a) => a.questionId !== null)
-        .map((a) =>
-          AUTO_GRADED.has(a.questionType)
-            ? { questionId: a.questionId, selectedOption: a.selectedOption }
-            : { questionId: a.questionId, textAnswer: a.textAnswer },
-        );
-      const response = await fetch(`/api/attempts/${attempt.id}/answers`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: payload }),
-      });
-      if (!response.ok) throw new Error();
-      setSaveState("saved");
-    } catch {
-      dirtyRef.current = true; // retry on the next change/tick of activity
-      setSaveState("error");
-    }
-  }, [attempt.id]);
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
+  }, []);
+
+  const persist = useCallback(
+    (opts?: { force?: boolean }): Promise<void> => {
+      const run = async () => {
+        if (!dirtyRef.current || attemptClosedRef.current) return;
+        if (submittedRef.current && !opts?.force) return;
+        dirtyRef.current = false;
+        setSaveState("saving");
+        try {
+          const payload = answersRef.current
+            .filter((a) => a.questionId !== null)
+            .map((a) =>
+              AUTO_GRADED.has(a.questionType)
+                ? { questionId: a.questionId, selectedOption: a.selectedOption }
+                : { questionId: a.questionId, textAnswer: a.textAnswer },
+            );
+          const response = await fetch(`/api/attempts/${attempt.id}/answers`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ answers: payload }),
+          });
+          if (response.status === 403) {
+            // Attempt already finalized server-side; stop saving, let
+            // submit/redirect take over (POST submit is idempotent).
+            attemptClosedRef.current = true;
+            setSaveState("idle");
+            return;
+          }
+          if (!response.ok) throw new Error();
+          setSaveState("saved");
+        } catch {
+          dirtyRef.current = true;
+          setSaveState("error");
+          // The UI promises an automatic retry — actually schedule one.
+          if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+          retryTimerRef.current = setTimeout(() => {
+            if (dirtyRef.current && !submittedRef.current) retryPersistRef.current();
+          }, RETRY_DELAY_MS);
+        }
+      };
+      persistChainRef.current = persistChainRef.current.then(run);
+      return persistChainRef.current;
+    },
+    [attempt.id],
+  );
+
+  useEffect(() => {
+    retryPersistRef.current = () => void persist();
+  }, [persist]);
 
   const submit = useCallback(async () => {
-    if (submittedRef.current) return;
-    submittedRef.current = true;
+    if (submitBusyRef.current || submittedRef.current) return;
+    submitBusyRef.current = true;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await persist();
+      // Flush unsaved answers BEFORE finalizing — submitting must never
+      // silently drop a change made inside the autosave debounce window.
+      await persist({ force: true });
+      if (dirtyRef.current && !attemptClosedRef.current) throw new Error("unsaved answers");
       const response = await fetch(`/api/attempts/${attempt.id}/submit`, { method: "POST" });
       if (!response.ok) throw new Error();
+      submittedRef.current = true;
       router.push(`/quizzes/${attempt.quizId}/result`);
     } catch {
-      submittedRef.current = false;
+      submitBusyRef.current = false;
       setSubmitting(false);
       setSubmitError("تعذّر تسليم الاختبار، تحقق من اتصالك ثم حاول مرة أخرى.");
     }
   }, [attempt.id, attempt.quizId, persist, router]);
 
-  // 1s display tick; auto-submit at zero.
+  // 1s display tick; measures clock skew here (impure reads belong in
+  // effects, not render); auto-submits at zero.
   useEffect(() => {
+    const expiresAt = new Date(attempt.expiresAt);
+    const skewMs = new Date(attempt.serverNow).getTime() - Date.now();
     const tick = () => {
-      const left = remainingSeconds(expiresAt, serverNow());
+      const left = remainingSeconds(expiresAt, new Date(Date.now() + skewMs));
       setRemaining(left);
       if (left <= 0) void submit();
     };
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [expiresAt, serverNow, submit]);
+  }, [attempt.expiresAt, attempt.serverNow, submit]);
 
   // Debounced autosave whenever answers change.
   useEffect(() => {
@@ -138,6 +188,8 @@ export function QuizRunner({ attempt }: { attempt: RunnerAttempt }) {
               </span>
             </p>
           </div>
+          {/* role="timer" keeps default aria-live="off" — announcing every
+              second would swamp a screen reader. */}
           <div
             className={`rounded-md px-3 py-1.5 font-mono text-lg font-bold tabular-nums ${
               remaining <= 60
@@ -146,7 +198,6 @@ export function QuizRunner({ attempt }: { attempt: RunnerAttempt }) {
             }`}
             dir="ltr"
             role="timer"
-            aria-live="polite"
           >
             {formatCountdown(remaining)}
           </div>
@@ -157,39 +208,50 @@ export function QuizRunner({ attempt }: { attempt: RunnerAttempt }) {
         {answers.map((answer, index) => (
           <li key={answer.questionId ?? index}>
             <Card>
-              <p className="mb-3 font-medium">
-                <span className="text-neutral-400 dark:text-neutral-500" dir="ltr">
-                  {index + 1}.
-                </span>{" "}
-                {answer.questionPrompt}
-              </p>
               {AUTO_GRADED.has(answer.questionType) && answer.options ? (
-                <div className="flex flex-col gap-2">
-                  {answer.options.map((option) => (
-                    <label
-                      key={option.id}
-                      className="flex cursor-pointer items-center gap-2 rounded-md border border-neutral-200 px-3 py-2 has-checked:border-neutral-900 has-checked:bg-neutral-50 dark:border-neutral-800 dark:has-checked:border-neutral-100 dark:has-checked:bg-neutral-900"
-                    >
-                      <input
-                        type="radio"
-                        name={`q-${answer.questionId ?? index}`}
-                        checked={answer.selectedOption === option.id}
-                        onChange={() => updateAnswer(index, { selectedOption: option.id })}
-                        disabled={submitting}
-                      />
-                      <span>{option.text}</span>
-                    </label>
-                  ))}
-                </div>
+                <fieldset>
+                  <legend className="mb-3 font-medium">
+                    <span className="text-neutral-400 dark:text-neutral-500" dir="ltr">
+                      {index + 1}.
+                    </span>{" "}
+                    {answer.questionPrompt}
+                  </legend>
+                  <div className="flex flex-col gap-2">
+                    {answer.options.map((option) => (
+                      <label
+                        key={option.id}
+                        className="flex cursor-pointer items-center gap-2 rounded-md border border-neutral-200 px-3 py-2 has-checked:border-neutral-900 has-checked:bg-neutral-50 dark:border-neutral-800 dark:has-checked:border-neutral-100 dark:has-checked:bg-neutral-900"
+                      >
+                        <input
+                          type="radio"
+                          name={`q-${answer.questionId ?? index}`}
+                          checked={answer.selectedOption === option.id}
+                          onChange={() => updateAnswer(index, { selectedOption: option.id })}
+                          disabled={submitting}
+                        />
+                        <span>{option.text}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
               ) : (
-                <textarea
-                  value={answer.textAnswer ?? ""}
-                  onChange={(event) => updateAnswer(index, { textAnswer: event.target.value })}
-                  disabled={submitting}
-                  rows={4}
-                  placeholder="اكتب إجابتك هنا..."
-                  className="w-full rounded-md border border-neutral-300 p-3 focus:border-neutral-900 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-100"
-                />
+                <>
+                  <p className="mb-3 font-medium" id={`prompt-${answer.questionId ?? index}`}>
+                    <span className="text-neutral-400 dark:text-neutral-500" dir="ltr">
+                      {index + 1}.
+                    </span>{" "}
+                    {answer.questionPrompt}
+                  </p>
+                  <textarea
+                    value={answer.textAnswer ?? ""}
+                    onChange={(event) => updateAnswer(index, { textAnswer: event.target.value })}
+                    disabled={submitting}
+                    rows={4}
+                    placeholder="اكتب إجابتك هنا..."
+                    aria-labelledby={`prompt-${answer.questionId ?? index}`}
+                    className="w-full rounded-md border border-neutral-300 p-3 focus:border-neutral-900 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-100"
+                  />
+                </>
               )}
             </Card>
           </li>

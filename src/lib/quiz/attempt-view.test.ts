@@ -80,7 +80,7 @@ describe("getAttemptForTrainee: ownership, redaction, lazy expiry", () => {
     expect(view.serverNow.getTime()).toBeLessThanOrEqual(after);
   });
 
-  it("lazily auto-submits an expired attempt on read, then reveals isCorrect but still no answer key", async () => {
+  it("lazily auto-submits an expired attempt on read, but keeps isCorrect hidden while a retry remains", async () => {
     const attempt = await prisma.attempt.findFirstOrThrow({ where: { quizId: quiz.id, userId: trainee.id } });
     await prisma.attempt.update({ where: { id: attempt.id }, data: { startedAt: new Date(Date.now() - 700_000) } });
 
@@ -89,9 +89,33 @@ describe("getAttemptForTrainee: ownership, redaction, lazy expiry", () => {
     expect(view.score).toBe(50); // MCQ answered correctly earlier, TRUE_FALSE left blank
     expect(view.passed).toBe(false);
 
+    // Attempt 1 of 2 failed — per-question correctness would hand the
+    // trainee the answer key for the retry, so it stays hidden.
     const mcqAnswer = view.answers.find((a) => a.questionType === "MCQ");
-    expect(mcqAnswer?.isCorrect).toBe(true); // visible once finalized
+    expect(mcqAnswer?.isCorrect).toBeNull();
     expect(JSON.stringify(view)).not.toContain("correctOption");
+  });
+
+  it("reveals isCorrect only once the quiz outcome is final (attempts exhausted), still no answer key", async () => {
+    // Use the second (final) attempt slot and fail it too.
+    const attempt2 = await startAttempt(session, quiz.id);
+    const rows = await prisma.attemptAnswer.findMany({ where: { attemptId: attempt2.id } });
+    const mcq = rows.find((r) => r.questionType === "MCQ")!;
+    await saveAnswers(session, attempt2.id, [{ questionId: mcq.questionId!, selectedOption: "b" }]);
+    await submitAttempt(session, attempt2.id);
+
+    const view = await getAttemptForTrainee(session, attempt2.id);
+    expect(view.status).toBe("SUBMITTED");
+    const mcqAnswer = view.answers.find((a) => a.questionType === "MCQ");
+    expect(mcqAnswer?.isCorrect).toBe(false); // no retry left — review is safe now
+    expect(JSON.stringify(view)).not.toContain("correctOption");
+
+    // The earlier failed attempt's review opens up too.
+    const attempt1 = await prisma.attempt.findFirstOrThrow({
+      where: { quizId: quiz.id, userId: trainee.id, attemptNumber: 1 },
+    });
+    const view1 = await getAttemptForTrainee(session, attempt1.id);
+    expect(view1.answers.find((a) => a.questionType === "MCQ")?.isCorrect).toBe(true);
   });
 });
 

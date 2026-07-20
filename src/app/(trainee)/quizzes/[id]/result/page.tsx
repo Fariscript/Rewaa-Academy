@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { getQuizResultForTrainee, type TraineeAttemptView } from "@/lib/quiz/attempt-view";
+import { getQuizResultForTrainee, isQuizOutcomeFinal, type TraineeAttemptView } from "@/lib/quiz/attempt-view";
 import { ForbiddenError, NotFoundError } from "@/lib/errors";
 import { QUIZ_STATUS_LABELS } from "@/lib/content/labels";
 import { formatDateTime } from "@/lib/dates";
@@ -31,8 +31,7 @@ function dateLabel(value: Date | null) {
   return formatDateTime(value);
 }
 
-function AttemptReview({ attempt }: { attempt: TraineeAttemptView }) {
-  const finalized = attempt.status === "SUBMITTED" || attempt.status === "AUTO_SUBMITTED";
+function AttemptReview({ attempt, showCorrectness }: { attempt: TraineeAttemptView; showCorrectness: boolean }) {
   return (
     <Card>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -59,7 +58,10 @@ function AttemptReview({ attempt }: { attempt: TraineeAttemptView }) {
           <li key={answer.questionId ?? index} className="rounded-md bg-neutral-50 p-3 dark:bg-neutral-900">
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
               <p className="font-medium">{answer.questionPrompt}</p>
-              {finalized || answer.isCorrect !== null ? (
+              {/* Correctness stays hidden while a retry is still possible
+                  (the view already nulls it) — showing صحيحة/خاطئة before
+                  then would hand the trainee the answer key for attempt 2. */}
+              {showCorrectness ? (
                 answer.isCorrect === null ? (
                   <Badge variant="warning">بانتظار التصحيح</Badge>
                 ) : answer.isCorrect ? (
@@ -156,11 +158,17 @@ export default async function QuizResultPage({ params }: { params: Promise<{ id:
         </div>
       </Card>
 
+      {!isQuizOutcomeFinal(outcome) ? (
+        <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
+          تفاصيل صحة الإجابات تظهر بعد اجتياز الاختبار أو استخدام جميع المحاولات.
+        </p>
+      ) : null}
+
       <div className="flex flex-col gap-4">
         {result.attempts
           .filter((a) => a.status !== "IN_PROGRESS")
           .map((attempt) => (
-            <AttemptReview key={attempt.id} attempt={attempt} />
+            <AttemptReview key={attempt.id} attempt={attempt} showCorrectness={isQuizOutcomeFinal(outcome)} />
           ))}
       </div>
     </div>

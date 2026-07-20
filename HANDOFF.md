@@ -47,6 +47,23 @@ placeholder home. A second build run closed that:
   CEO before real trainees get access.
 - Remember to tell Ibrahim's content team about open item #7 (95% is only
   reachable at question counts where it lands on a whole number).
+- **Post-build adversarial review (multi-agent, findings verified) led to
+  a fixes pass:** (1) per-question isCorrect/feedback are now hidden until
+  the quiz OUTCOME is final (passed or attempts exhausted) — showing them
+  on a failed attempt 1 would let a trainee reconstruct the answer key for
+  attempt 2 (exact for TRUE_FALSE); (2) the quiz runner's pre-submit flush
+  was dead code (submittedRef set before persist), silently dropping
+  answers changed inside the autosave debounce window — submit now flushes
+  first and refuses to finalize unsaved answers; autosaves are serialized
+  through one promise chain and failures actually retry; (3) two
+  react-hooks lint errors that made CI red; (4) certificate PDF no longer
+  crashes on names outside WinAnsi (sanitized instead); (5) CI got a
+  concurrency group and push-only triggers; a11y fieldset/legend on quiz
+  options. Known-and-accepted (documented, not fixed): the route-boundary
+  redaction test exercises the lib mapper rather than invoking the Next
+  route handlers; the API permits starting attempt 2 while attempt 1 is
+  PENDING_MANUAL_GRADE (cap still enforced; UI doesn't offer it);
+  sector-select shows the old value while its PATCH is in flight.
 
 Everything below is the original snapshot.
 

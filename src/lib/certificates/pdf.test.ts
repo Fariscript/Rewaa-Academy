@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { generateCertificatePdf, splitTextRuns } from "./pdf";
+import { PDFDict, PDFDocument, PDFName } from "pdf-lib";
+import { generateCertificatePdf, splitTextRuns, toWinAnsiSafe } from "./pdf";
+
+async function embeddedBaseFonts(bytes: Uint8Array): Promise<string[]> {
+  const doc = await PDFDocument.load(bytes);
+  return doc.context
+    .enumerateIndirectObjects()
+    .map(([, obj]) => obj)
+    .filter((obj): obj is PDFDict => obj instanceof PDFDict)
+    .map((dict) => dict.get(PDFName.of("BaseFont")))
+    .filter((value) => value !== undefined)
+    .map((value) => String(value));
+}
 
 describe("generateCertificatePdf", () => {
   it("produces a valid, non-trivial PDF byte stream for Arabic content", async () => {
@@ -15,7 +27,7 @@ describe("generateCertificatePdf", () => {
     expect(header).toBe("%PDF-");
   });
 
-  it("renders a Latin trainee name without throwing (SSO names may not be Arabic)", async () => {
+  it("draws Latin names and digits with an embedded Latin font, not the Arabic-only one", async () => {
     const bytes = await generateCertificatePdf({
       id: "cert_test_456",
       traineeName: "Trainee Fixture",
@@ -23,6 +35,31 @@ describe("generateCertificatePdf", () => {
       completionDate: new Date("2026-07-20T00:00:00.000Z"),
     });
     expect(Buffer.from(bytes.slice(0, 5)).toString("utf8")).toBe("%PDF-");
+    // Regression guard for the tofu-box bug: missing glyphs do NOT throw
+    // (pdf-lib silently draws .notdef), so inspect the parsed font
+    // dictionaries — the fixed pipeline embeds Helvetica faces for the
+    // Latin runs; the broken one used only the Arabic Noto fonts (plus
+    // Courier for the verification line).
+    const fonts = await embeddedBaseFonts(bytes);
+    expect(fonts.some((name) => name.includes("Helvetica"))).toBe(true);
+  });
+
+  it("does not throw on names outside WinAnsi (replaced, not crashed)", async () => {
+    const bytes = await generateCertificatePdf({
+      id: "cert_test_789",
+      traineeName: "Emre Şahin 李",
+      sectorName: "الخدمات",
+      completionDate: new Date("2026-07-20T00:00:00.000Z"),
+    });
+    expect(Buffer.from(bytes.slice(0, 5)).toString("utf8")).toBe("%PDF-");
+  });
+});
+
+describe("toWinAnsiSafe", () => {
+  it("keeps ASCII and Latin-1, replaces everything else", () => {
+    expect(toWinAnsiSafe("Trainee Fixture")).toBe("Trainee Fixture");
+    expect(toWinAnsiSafe("Émile Noël")).toBe("Émile Noël");
+    expect(toWinAnsiSafe("Emre Şahin 李")).toBe("Emre ?ahin ?");
   });
 });
 

@@ -10,9 +10,16 @@ import { getQuizOutcome, type QuizOutcome } from "./outcome";
 // AttemptAnswer rows carry the answer key (correctOption, snapshotted at
 // attempt-start), so raw rows must never cross that boundary: with a
 // 2-attempt cap, a leaked key on attempt 1 makes attempt 2 meaningless.
-// correctOption is omitted here unconditionally — even after finalization —
-// and per-item isCorrect/feedback stay hidden while the attempt is still
-// IN_PROGRESS.
+// correctOption is omitted here unconditionally — even after finalization.
+//
+// Per-item isCorrect/feedback are hidden until the QUIZ OUTCOME is final
+// (passed, or every allowed attempt used), not merely until the attempt is
+// finalized: attempt 2 snapshots the same approved question set, so a
+// failed attempt 1's per-question صحيحة/خاطئة badges would let the trainee
+// reconstruct the key for the retry (exactly for TRUE_FALSE, mostly for
+// MCQ) and trivially clear the 95% bar — defeating T-02/T-03/T-20.
+// (An Admin cap override granted after the trainee has already seen their
+// final review is accepted as normal remediation.)
 export interface TraineeAnswerView {
   questionId: string | null;
   questionPrompt: string;
@@ -44,10 +51,17 @@ export interface TraineeAttemptView {
   answers: TraineeAnswerView[];
 }
 
+// True once no further attempt can change this quiz's result — the only
+// state in which per-item correctness may be shown to the trainee.
+export function isQuizOutcomeFinal(outcome: QuizOutcome): boolean {
+  return outcome.passed || outcome.attemptsUsed >= outcome.attemptsAllowed;
+}
+
 export function toTraineeAttemptView(
   attempt: Attempt & { answers: AttemptAnswer[]; quiz: { title: string; timeLimitSeconds: number } },
+  revealCorrectness = false,
 ): TraineeAttemptView {
-  const inProgress = attempt.status === "IN_PROGRESS";
+  const hideCorrectness = attempt.status === "IN_PROGRESS" || !revealCorrectness;
   return {
     id: attempt.id,
     quizId: attempt.quizId,
@@ -67,8 +81,8 @@ export function toTraineeAttemptView(
       options: a.options,
       selectedOption: a.selectedOption,
       textAnswer: a.textAnswer,
-      isCorrect: inProgress ? null : a.isCorrect,
-      feedback: inProgress ? null : a.feedback,
+      isCorrect: hideCorrectness ? null : a.isCorrect,
+      feedback: hideCorrectness ? null : a.feedback,
     })),
   };
 }
@@ -99,12 +113,13 @@ export async function getQuizResultForTrainee(session: Session | null, quizId: s
     include: { answers: { orderBy: { id: "asc" } }, quiz: true },
   });
 
+  const reveal = isQuizOutcomeFinal(outcome);
   return {
     quizId,
     quizTitle: quiz.title,
     lessonId: quiz.lessonId,
     outcome,
-    attempts: attempts.map(toTraineeAttemptView),
+    attempts: attempts.map((attempt) => toTraineeAttemptView(attempt, reveal)),
   };
 }
 
@@ -129,5 +144,11 @@ export async function getAttemptForTrainee(session: Session | null, attemptId: s
     where: { id: attemptId },
     include: { answers: { orderBy: { id: "asc" } }, quiz: true },
   });
-  return toTraineeAttemptView(fresh);
+
+  // Correctness detail is gated on quiz-outcome finality across ALL of the
+  // caller's attempts on this quiz, not just this one — see the header
+  // comment. getQuizOutcome re-verifies sector scope and lazily syncs
+  // sibling attempts.
+  const outcome = await getQuizOutcome(session, fresh.quizId);
+  return toTraineeAttemptView(fresh, isQuizOutcomeFinal(outcome));
 }

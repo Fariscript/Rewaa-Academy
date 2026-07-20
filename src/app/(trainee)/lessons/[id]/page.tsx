@@ -78,10 +78,13 @@ function QuizCard({ quiz }: { quiz: LearningHomeQuiz }) {
             عرض النتيجة
           </Link>
         </div>
+      ) : !quiz.hasApprovedQuestions ? (
+        // T-12: no approved questions yet — startAttempt would refuse.
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">الاختبار غير متاح بعد.</p>
       ) : (
         <StartQuizButton
           quizId={quiz.quizId}
-          label={outcome.attemptsUsed > 0 ? "ابدأ المحاولة الثانية" : "ابدأ الاختبار"}
+          label={outcome.attemptsUsed > 0 ? "ابدأ المحاولة التالية" : "ابدأ الاختبار"}
         />
       )}
     </Card>

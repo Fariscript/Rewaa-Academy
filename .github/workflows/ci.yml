@@ -6,10 +6,15 @@
 # rows outside the test lifecycle (see CLAUDE.md "Blocked").
 name: CI
 
+# push-only: a pull_request trigger alongside push:["**"] would run every
+# PR-branch commit twice. The concurrency group cancels superseded runs.
 on:
   push:
     branches: ["**"]
-  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:

@@ -99,6 +99,17 @@ export function splitTextRuns(text: string): TextRun[] {
   return runs;
 }
 
+// Standard fonts encode WinAnsi only — a name containing a character
+// outside it (Turkish Ş, Cyrillic, CJK, ...) would make
+// widthOfTextAtSize/drawText THROW and fail the whole certificate.
+// Replace anything unencodable with "?" instead: a rare odd glyph on an
+// edge-case name beats a hard 500 on download. (Safe subset of WinAnsi:
+// printable ASCII, the Latin-1 supplement, and CP1252 punctuation.)
+const WINANSI_SAFE = /[\x20-\x7E\u00A0-\u00FF\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u2026\u20AC\u0152\u0153\u0160\u0161\u017D\u017E\u0178\u2122]/;
+export function toWinAnsiSafe(text: string): string {
+  return [...text].map((char) => (WINANSI_SAFE.test(char) ? char : "?")).join("");
+}
+
 export async function generateCertificatePdf(input: CertificatePdfInput): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
@@ -127,16 +138,16 @@ export async function generateCertificatePdf(input: CertificatePdfInput): Promis
     color = rgb(0, 0, 0),
   ) => {
     const runs = splitTextRuns(text);
-    const measured = runs.map((run) => ({
-      run,
-      font: run.arabic ? fonts.arabic : fonts.latin,
-      width: (run.arabic ? fonts.arabic : fonts.latin).widthOfTextAtSize(run.text, size),
-    }));
+    const measured = runs.map((run) => {
+      const font = run.arabic ? fonts.arabic : fonts.latin;
+      const runText = run.arabic ? run.text : toWinAnsiSafe(run.text);
+      return { runText, font, width: font.widthOfTextAtSize(runText, size) };
+    });
     const total = measured.reduce((sum, m) => sum + m.width, 0);
     let x = centerX + total / 2; // right edge; runs advance leftward
     for (const m of measured) {
       x -= m.width;
-      page.drawText(m.run.text, { x, y, size, font: m.font, color });
+      page.drawText(m.runText, { x, y, size, font: m.font, color });
     }
   };
 

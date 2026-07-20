@@ -21,6 +21,9 @@ export interface LearningHomeQuiz {
   // Set when an attempt is currently open, so the UI can offer "resume"
   // instead of a Start button (T-33: starting is always an explicit act).
   inProgressAttemptId: string | null;
+  // startAttempt refuses a quiz with no APPROVED questions (T-12) — the UI
+  // shows "not available yet" instead of a Start button that would 403.
+  hasApprovedQuestions: boolean;
 }
 
 export interface LearningHomeLesson {
@@ -63,7 +66,10 @@ export async function getMyLearningHome(session: Session | null): Promise<Learni
   const lessonIds = sector.subSectors.flatMap((s) => s.units.flatMap((u) => u.lessons.map((l) => l.id)));
 
   const [quizzes, completions] = await Promise.all([
-    prisma.quiz.findMany({ where: { lessonId: { in: lessonIds } } }),
+    prisma.quiz.findMany({
+      where: { lessonId: { in: lessonIds } },
+      include: { _count: { select: { questions: { where: { status: "APPROVED" } } } } },
+    }),
     prisma.lessonCompletion.findMany({ where: { userId: session.user.id, lessonId: { in: lessonIds } } }),
   ]);
   const quizIds = quizzes.map((q) => q.id);
@@ -96,6 +102,7 @@ export async function getMyLearningHome(session: Session | null): Promise<Learni
       unlocked: completedLessonIds.has(lessonId),
       outcome,
       inProgressAttemptId: quizAttempts.find((a) => a.status === "IN_PROGRESS")?.id ?? null,
+      hasApprovedQuestions: quiz._count.questions > 0,
     };
   };
 
@@ -135,7 +142,10 @@ export async function getMyLesson(session: Session | null, lessonId: string): Pr
 
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    include: { unit: { include: { subSector: true } }, quiz: true },
+    include: {
+      unit: { include: { subSector: true } },
+      quiz: { include: { _count: { select: { questions: { where: { status: "APPROVED" } } } } } },
+    },
   });
   if (!lesson) throw new NotFoundError("Lesson not found");
 
@@ -167,6 +177,7 @@ export async function getMyLesson(session: Session | null, lessonId: string): Pr
       unlocked: completion !== null,
       outcome: computeQuizOutcome(synced, attemptsAllowed),
       inProgressAttemptId: synced.find((a) => a.status === "IN_PROGRESS")?.id ?? null,
+      hasApprovedQuestions: lesson.quiz._count.questions > 0,
     };
   }
 

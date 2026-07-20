@@ -95,6 +95,23 @@ describe("getMyLearningHome / getMyLesson (FR-13 + T-7/T-8 read model)", () => {
     expect(lessonView.quiz!.outcome.attemptsAllowed).toBe(2);
   });
 
+  it("reflects an admin attempt-cap override in both reads", async () => {
+    const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@example.com" } });
+    const { grantExtraAttempt } = await import("@/lib/admin/attempt-override");
+    await grantExtraAttempt(sessionFor(admin.id, "ADMIN"), trainee.id, quiz.id, "اختبار مسار العرض");
+
+    const lessonView = await getMyLesson(session, lesson.id);
+    expect(lessonView.quiz!.outcome.attemptsAllowed).toBe(3);
+
+    const home = await getMyLearningHome(session);
+    const row = home!.subSectors
+      .flatMap((s) => s.units)
+      .flatMap((u) => u.lessons)
+      .find((l) => l.lessonId === lesson.id);
+    expect(row!.quiz!.outcome.attemptsAllowed).toBe(3);
+    expect(row!.quiz!.hasApprovedQuestions).toBe(true);
+  });
+
   it("lazily auto-submits an expired open attempt during the home read (T-32)", async () => {
     const open = await prisma.attempt.findFirstOrThrow({
       where: { quizId: quiz.id, userId: trainee.id, status: "IN_PROGRESS" },

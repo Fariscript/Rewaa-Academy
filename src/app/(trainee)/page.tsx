@@ -21,6 +21,9 @@ function QuizBadge({ lesson }: { lesson: LearningHomeLesson }) {
   if (!lesson.quiz) return null;
   if (!lesson.quiz.unlocked) return <Badge variant="neutral">الاختبار مقفل</Badge>;
   const status = lesson.quiz.outcome.status;
+  if (status === "NOT_STARTED" && !lesson.quiz.hasApprovedQuestions) {
+    return <Badge variant="neutral">غير متاح بعد</Badge>;
+  }
   return <Badge variant={STATUS_VARIANTS[status]}>{QUIZ_STATUS_LABELS[status]}</Badge>;
 }
 
