@@ -26,11 +26,11 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | FR-25 | Daily reminders, pre-session alerts, “behind” alerts, trainer alerts | - | Not started | | |
 | FR-26 | Successful/failed call library, written feedback, final rating (commun | - | Not started | | |
 | FR-27 | Trainee progress, attendance, trainer performance, department reports | - | Not started | | |
-| T-1 | A pop quiz appears after each lesson and is graded under the same rule | Phase 1 | Partial (one Quiz stub per Lesson exists; grading/timer/scoring is slice 4) | prisma/schema.prisma, prisma/seed.ts | src/lib/content/quiz-unlock.test.ts |
-| T-2 | Passing grade is 95% per quiz | Phase 1 | Not started | | |
-| T-3 | 2 attempts per quiz | Phase 1 | Not started | | |
+| T-1 | A pop quiz appears after each lesson and is graded under the same rule | Phase 1 | Done | prisma/schema.prisma, prisma/seed.ts, src/lib/quiz/*.ts | src/lib/quiz/*.test.ts |
+| T-2 | Passing grade is 95% per quiz | Phase 1 | Done (exact-fraction comparison, no rounding — see open item #7) | src/lib/quiz/scoring.ts | src/lib/quiz/scoring.test.ts |
+| T-3 | 2 attempts per quiz | Phase 1 | Done (cap enforced unconditionally; consequence-after-both-fail is open item #1, stubbed) | src/lib/quiz/start-attempt.ts, src/lib/quiz/outcome.ts | src/lib/quiz/start-attempt.test.ts, src/lib/quiz/outcome.test.ts |
 | T-4 | Certificate auto-generated once all required quizzes are passed (name, | Phase 1 | Not started | | |
-| T-5 | Quizzes are sector-dependent, following each sector's own content layo | Phase 1 | Not started | | |
+| T-5 | Quizzes are sector-dependent, following each sector's own content layo | Phase 1 | Done | src/lib/quiz/start-attempt.ts, src/lib/quiz/outcome.ts | src/lib/quiz/start-attempt.test.ts, src/lib/quiz/outcome.test.ts |
 | T-6 | Supported question types: multiple choice, true/false, sales scenarios | Phase 1 | Not started | | |
 | T-7 | A quiz unlocks only after its associated lesson is marked complete | Phase 1 | Done | src/lib/content/lesson-completion.ts, src/lib/content/quiz-unlock.ts | src/lib/content/lesson-completion.test.ts, src/lib/content/quiz-unlock.test.ts |
 | T-8 | Quiz surfaces to the trainee without requiring manual notification fro | Phase 1 | Done (unlock state is computed on read — nothing to manually surface) | src/lib/content/quiz-unlock.ts | src/lib/content/quiz-unlock.test.ts |
@@ -41,23 +41,23 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | T-13 | Trainer/Training Manager can manually add, edit, or retire questions | Phase 1 | Not started | | |
 | T-14 | Questions tagged by sector, skill type, unit, and question type | Phase 1 | Not started | | |
 | T-15 | Question bank supports versioning without altering historical results | Phase 1 | Not started | | |
-| T-16 | Engine assembles a quiz from approved questions matching the trainee's | Phase 1 | Not started | | |
-| T-17 | Objective question types (MCQ, true/false) are auto-graded | Phase 1 | Not started | | |
-| T-18 | Scenario / free-text items are routed to the Trainer for manual gradin | Phase 1 | Not started | | |
-| T-19 | Engine records trainee ID, quiz ID, timestamp, answers, score, and out | Phase 1 | Not started | | |
-| T-20 | 2-attempt cap enforced; higher score is the trainee's final result | Phase 1 | Not started | | |
+| T-16 | Engine assembles a quiz from approved questions matching the trainee's | Phase 1 | Partial (each quiz has a fixed question set owned directly by it, not a dynamically-matched pool — approval/versioning workflow itself is slice 5) | prisma/schema.prisma, src/lib/quiz/start-attempt.ts | src/lib/quiz/start-attempt.test.ts |
+| T-17 | Objective question types (MCQ, true/false) are auto-graded | Phase 1 | Done | src/lib/quiz/scoring.ts, src/lib/quiz/attempt-lifecycle.ts | src/lib/quiz/scoring.test.ts, src/lib/quiz/attempt-flow.test.ts |
+| T-18 | Scenario / free-text items are routed to the Trainer for manual gradin | Phase 1 | Not started (slice 6) | | |
+| T-19 | Engine records trainee ID, quiz ID, timestamp, answers, score, and out | Phase 1 | Done | prisma/schema.prisma (Attempt, AttemptAnswer) | src/lib/quiz/start-attempt.test.ts, src/lib/quiz/attempt-flow.test.ts |
+| T-20 | 2-attempt cap enforced; higher score is the trainee's final result | Phase 1 | Done | src/lib/quiz/start-attempt.ts, src/lib/quiz/outcome.ts | src/lib/quiz/outcome.test.ts |
 | T-21 | Shows which trainees have/haven't completed each quiz, and who's on at | Phase 1 | Not started | | |
 | T-22 | Shows average scores across a cohort | Phase 1 | Not started | | |
 | T-23 | Flags trainees who failed both attempts | Phase 1 | Not started | | |
 | T-24 | Per-trainee performance reports and training-level trends | Phase 2 | Not started | | |
 | T-25 | Trainer can view submitted assignments/mock calls and enter a grade wi | Phase 1 | Not started | | |
 | T-26 | Manually graded items follow the same 95% / 2-attempt logic as auto-gr | Phase 1 | Not started | | |
-| T-27 | Every attempt is attributed to a trainee via the existing Google SSO s | Phase 1 | Partial (session carries user id/role; attempt records land in slice 4) | src/auth.ts, src/lib/auth/types.d.ts | src/auth.session-expiry.test.ts |
+| T-27 | Every attempt is attributed to a trainee via the existing Google SSO s | Phase 1 | Done | src/auth.ts, src/lib/quiz/start-attempt.ts | src/auth.session-expiry.test.ts, src/lib/quiz/start-attempt.test.ts |
 | T-28 | Certificate generation pulls trainee name and completion date from the | Phase 1 | Not started | | |
 | T-29 | Practical/video test: trainee performs steps in-platform, AI grades th | Phase 2 | Not started | | |
 | T-30 | Voice-simulation test: AI plays a customer/lead, scores the trainee's  | Phase 2 | Not started | | |
 | T-31 | Voice quiz: AI agent asks the trainee a question aloud; trainee replie | Phase 2 | Not started | | |
-| T-32 | Pop quiz includes a visible countdown timer per attempt; quiz auto-sub | Phase 1 | Not started | | |
+| T-32 | Pop quiz includes a visible countdown timer per attempt; quiz auto-sub | Phase 1 | Partial (server-side timeLimit + lazy auto-submit-on-access done; visible countdown UI not built — no trainee-facing quiz UI exists yet) | prisma/schema.prisma (Quiz.timeLimitSeconds), src/lib/quiz/attempt-lifecycle.ts | src/lib/quiz/start-attempt.test.ts, src/lib/quiz/attempt-flow.test.ts |
 | T-33 | Quiz does not auto-launch when a lesson is marked complete | Phase 1 | Done (unlock check is read-only; nothing creates an attempt — the Start-button/attempt flow itself is slice 4) | src/lib/content/quiz-unlock.ts, src/lib/content/lesson-completion.ts | src/lib/content/quiz-unlock.test.ts |
 | T-34 | AI Voice Call Training: AI agent conducts a simulated sales call with  | Phase 2 | Not started | | |
 | T-35 | AI Video Grader: trainee uploads a video (e.g. recorded mock call or p | Phase 2 | Not started | | |

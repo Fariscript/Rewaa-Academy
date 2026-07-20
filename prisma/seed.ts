@@ -49,6 +49,147 @@ const FIXTURE_TAXONOMY = [
   },
 ];
 
+type QuestionFixture = {
+  type: "MCQ" | "TRUE_FALSE";
+  prompt: string;
+  options: { id: string; text: string }[];
+  correctOption: string;
+};
+
+// Open item #7 (CLAUDE.md): 95% is only reachable at question counts that
+// land on a whole number. These fixture quizzes deliberately have just 2
+// questions each (0/50/100% possible, never 95%) because they're for test
+// convenience, not real trainee-facing content — do NOT copy this count
+// when authoring real quizzes.
+const FIXTURE_QUESTIONS: Record<string, QuestionFixture[]> = {
+  "استقبال العميل": [
+    {
+      type: "MCQ",
+      prompt: "ما هي أول خطوة عند استقبال العميل؟",
+      options: [
+        { id: "a", text: "الترحيب والابتسام" },
+        { id: "b", text: "سؤاله عن الدفع فوراً" },
+        { id: "c", text: "تجاهله حتى يتحدث" },
+      ],
+      correctOption: "a",
+    },
+    {
+      type: "TRUE_FALSE",
+      prompt: "يجوز مقاطعة العميل أثناء حديثه لتسريع الخدمة.",
+      options: [
+        { id: "true", text: "صحيح" },
+        { id: "false", text: "خطأ" },
+      ],
+      correctOption: "false",
+    },
+  ],
+  "حساب التكلفة": [
+    {
+      type: "MCQ",
+      prompt: "عند تسعير الخدمة، ماذا يجب توضيحه للعميل أولاً؟",
+      options: [
+        { id: "a", text: "السعر الإجمالي شاملاً الضريبة" },
+        { id: "b", text: "لا داعي لذكر السعر" },
+        { id: "c", text: "سعر تقديري دون أي تفاصيل" },
+      ],
+      correctOption: "a",
+    },
+    {
+      type: "TRUE_FALSE",
+      prompt: "يمكن تغيير السعر المتفق عليه دون إبلاغ العميل.",
+      options: [
+        { id: "true", text: "صحيح" },
+        { id: "false", text: "خطأ" },
+      ],
+      correctOption: "false",
+    },
+  ],
+  "الرد على اعتراض السعر": [
+    {
+      type: "MCQ",
+      prompt: "عندما يعترض العميل على السعر، ما الأنسب؟",
+      options: [
+        { id: "a", text: "الاستماع لسبب الاعتراض ثم توضيح القيمة المقدمة" },
+        { id: "b", text: "خفض السعر فوراً دون نقاش" },
+        { id: "c", text: "إنهاء المكالمة" },
+      ],
+      correctOption: "a",
+    },
+    {
+      type: "TRUE_FALSE",
+      prompt: "الاعتراض على السعر يعني أن العميل غير مهتم نهائياً.",
+      options: [
+        { id: "true", text: "صحيح" },
+        { id: "false", text: "خطأ" },
+      ],
+      correctOption: "false",
+    },
+  ],
+  "الجرد الدوري": [
+    {
+      type: "MCQ",
+      prompt: "ما الغرض الأساسي من الجرد الدوري؟",
+      options: [
+        { id: "a", text: "مطابقة المخزون الفعلي مع السجلات" },
+        { id: "b", text: "زيادة الأسعار" },
+        { id: "c", text: "تقليل عدد الموظفين" },
+      ],
+      correctOption: "a",
+    },
+    {
+      type: "TRUE_FALSE",
+      prompt: "يمكن تجاهل الفروقات الصغيرة في الجرد دون تسجيلها.",
+      options: [
+        { id: "true", text: "صحيح" },
+        { id: "false", text: "خطأ" },
+      ],
+      correctOption: "false",
+    },
+  ],
+  "افتتاح المحادثة": [
+    {
+      type: "MCQ",
+      prompt: "أفضل طريقة لافتتاح المحادثة مع عميل جديد في المقهى؟",
+      options: [
+        { id: "a", text: "ترحيب ودود وسؤال عن رغبته" },
+        { id: "b", text: "الانتظار حتى يبدأ العميل بالحديث" },
+        { id: "c", text: "عرض العروض فوراً دون ترحيب" },
+      ],
+      correctOption: "a",
+    },
+    {
+      type: "TRUE_FALSE",
+      prompt: "نبرة الصوت لا تؤثر على انطباع العميل الأول.",
+      options: [
+        { id: "true", text: "صحيح" },
+        { id: "false", text: "خطأ" },
+      ],
+      correctOption: "false",
+    },
+  ],
+  "درجات حفظ الأطعمة": [
+    {
+      type: "MCQ",
+      prompt: "ما أهمية الالتزام بدرجات حفظ الأطعمة؟",
+      options: [
+        { id: "a", text: "منع تلف الطعام وضمان سلامة العملاء" },
+        { id: "b", text: "تسريع التحضير فقط" },
+        { id: "c", text: "لا تأثير يذكر" },
+      ],
+      correctOption: "a",
+    },
+    {
+      type: "TRUE_FALSE",
+      prompt: "يمكن ترك الأطعمة القابلة للتلف خارج التبريد لفترات طويلة دون خطر.",
+      options: [
+        { id: "true", text: "صحيح" },
+        { id: "false", text: "خطأ" },
+      ],
+      correctOption: "false",
+    },
+  ],
+};
+
 async function seedUsers() {
   for (const user of FIXTURE_USERS) {
     await prisma.user.upsert({
@@ -94,11 +235,28 @@ async function seedTaxonomy() {
           }
 
           // T-1: a pop quiz appears after each lesson.
-          await prisma.quiz.upsert({
+          const quiz = await prisma.quiz.upsert({
             where: { lessonId: lesson.id },
             update: {},
             create: { lessonId: lesson.id, title: `اختبار: ${lessonTitle}` },
           });
+
+          for (const questionFixture of FIXTURE_QUESTIONS[lessonTitle] ?? []) {
+            const existingQuestion = await prisma.question.findFirst({
+              where: { quizId: quiz.id, prompt: questionFixture.prompt },
+            });
+            if (!existingQuestion) {
+              await prisma.question.create({
+                data: {
+                  quizId: quiz.id,
+                  type: questionFixture.type,
+                  prompt: questionFixture.prompt,
+                  options: questionFixture.options,
+                  correctOption: questionFixture.correctOption,
+                },
+              });
+            }
+          }
         }
       }
     }

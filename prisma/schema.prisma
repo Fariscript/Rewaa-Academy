@@ -38,6 +38,7 @@ model User {
   sessions          Session[]
   auditLogs         AuditLog[]
   lessonCompletions LessonCompletion[]
+  attempts          Attempt[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -137,19 +138,109 @@ model LessonCompletion {
   @@map("lesson_completions")
 }
 
-// Bare stub — T-1: one pop quiz per lesson. Slice 4 (Quiz engine) extends
-// this same table with timer/scoring/questions rather than retrofitting the
-// lesson relationship later.
+// T-1: one pop quiz per lesson.
 model Quiz {
   id       String @id @default(cuid())
   lessonId String @unique
   lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   title    String
 
+  // T-32: every quiz has a visible countdown timer.
+  timeLimitSeconds Int @default(600)
+
+  questions Question[]
+  attempts  Attempt[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("quizzes")
+}
+
+// T-17: only the auto-gradable types are modeled here. Scenario/free-text/
+// mock-call (T-18, manually graded) are slice 6's concern. Question is
+// quiz-owned for now — slice 5 adds status (draft/approved/retired) and
+// version history onto this same table; T-14's sector/skill-type/unit tags
+// stay derivable via quiz.lesson.unit rather than being duplicated here.
+enum QuestionType {
+  MCQ
+  TRUE_FALSE
+}
+
+model Question {
+  id     String       @id @default(cuid())
+  quizId String
+  quiz   Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  type   QuestionType
+  prompt String
+
+  // MCQ: [{id, text}, ...]. TRUE_FALSE: [{id:"true",text:"..."},{id:"false",text:"..."}].
+  options       Json
+  correctOption String
+
+  attemptAnswers AttemptAnswer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("questions")
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  AUTO_SUBMITTED
+}
+
+// T-19: trainee id, quiz id, timestamp, answers, score, outcome all live
+// here. T-3/T-20: attemptNumber is capped at 2 by application logic plus a
+// unique constraint as a defense-in-depth backstop against a race.
+model Attempt {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId        String
+  quiz          Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  attemptNumber Int
+  status        AttemptStatus @default(IN_PROGRESS)
+
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+
+  // Null until finalized (SUBMITTED or AUTO_SUBMITTED).
+  score  Float?
+  passed Boolean?
+
+  answers AttemptAnswer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, quizId, attemptNumber])
+  @@map("attempts")
+}
+
+// NFR-13/T-15: question content is snapshotted at attempt-start, not
+// live-referenced — editing a Question later (slice 5) must never change
+// what a completed attempt was scored or is displayed against. questionId
+// is a soft traceability link only (SetNull on delete/retire).
+model AttemptAnswer {
+  id         String    @id @default(cuid())
+  attemptId  String
+  attempt    Attempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId String?
+  question   Question? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  questionPrompt String
+  questionType   QuestionType
+  options        Json
+  correctOption  String
+
+  selectedOption String?
+  isCorrect      Boolean?
+
+  @@unique([attemptId, questionId])
+  @@map("attempt_answers")
 }
 
 // NFR-05: audit trail of Admin actions (user creation, sector/role

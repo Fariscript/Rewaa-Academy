@@ -88,6 +88,14 @@ roleplay (T-30), deeper dashboard analytics (T-24).
 5. Notification rules (triggers, channels, wording) — not yet defined.
 6. FR-26 (Call Library & Evaluation) — flagged for a change in the latest
    meeting, but no detail was captured yet.
+7. 95% passing grade is only reachable at question counts where it lands on
+   a whole number (e.g. 20 questions → 19/20 = 95%). A quiz authored with a
+   count where 95% falls between two integer results (e.g. 10 questions:
+   90% or 100%) can never be passed. This isn't a code decision — the
+   engine scores exactly, no rounding — it's a content-authoring constraint
+   that needs communicating to whoever sets question counts per quiz
+   (Ibrahim's content team) so quizzes aren't accidentally unpassable.
+   Flagged too in prisma/seed.ts next to the fixture question counts.
 
 These are exactly the decisions that cause expensive rebuilds if guessed
 wrong. If a task depends on one, implement everything around it and leave
