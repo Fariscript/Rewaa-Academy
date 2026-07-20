@@ -14,9 +14,14 @@ export default async function TraineeLayout({ children }: { children: React.Reac
     <>
       <header className="border-b border-neutral-200 dark:border-neutral-800">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <Link href="/" className="font-bold">
-            أكاديمية رِواء للمبيعات
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="font-bold">
+              أكاديمية رِواء للمبيعات
+            </Link>
+            <Link href="/certificate" className="text-sm text-neutral-600 hover:underline dark:text-neutral-300">
+              الشهادة
+            </Link>
+          </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-neutral-500 dark:text-neutral-400">{session.user.name}</span>
             <form

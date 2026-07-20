@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { getQuizResultForTrainee, type TraineeAttemptView } from "@/lib/quiz/attempt-view";
 import { ForbiddenError, NotFoundError } from "@/lib/errors";
 import { QUIZ_STATUS_LABELS } from "@/lib/content/labels";
+import { formatDateTime } from "@/lib/dates";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -27,7 +28,7 @@ const ATTEMPT_STATUS_LABELS: Record<string, string> = {
 
 function dateLabel(value: Date | null) {
   if (!value) return null;
-  return new Intl.DateTimeFormat("ar", { dateStyle: "medium", timeStyle: "short" }).format(value);
+  return formatDateTime(value);
 }
 
 function AttemptReview({ attempt }: { attempt: TraineeAttemptView }) {
