@@ -51,7 +51,7 @@ describe("getQuizOutcome: best-score-wins across attempts (T-20)", () => {
     // Not unlocked yet either, but outcome only reports on attempts.
     await markLessonComplete(session, lesson.id);
     const outcome = await getQuizOutcome(session, quiz.id);
-    expect(outcome).toEqual({ attemptsUsed: 0, bestScore: null, passed: false, status: "NOT_STARTED" });
+    expect(outcome).toEqual({ attemptsUsed: 0, attemptsAllowed: 2, bestScore: null, passed: false, status: "NOT_STARTED" });
   });
 
   it("is IN_PROGRESS while attempt 1 is open", async () => {
@@ -65,7 +65,7 @@ describe("getQuizOutcome: best-score-wins across attempts (T-20)", () => {
 
   it("stays IN_PROGRESS (retry available) after one failed attempt", async () => {
     const outcome = await getQuizOutcome(session, quiz.id);
-    expect(outcome).toEqual({ attemptsUsed: 1, bestScore: 0, passed: false, status: "IN_PROGRESS" });
+    expect(outcome).toEqual({ attemptsUsed: 1, attemptsAllowed: 2, bestScore: 0, passed: false, status: "IN_PROGRESS" });
   });
 
   it("reports PASSED with the higher of the two scores once attempt 2 passes", async () => {
@@ -73,7 +73,7 @@ describe("getQuizOutcome: best-score-wins across attempts (T-20)", () => {
     await answerAndSubmit(session, attempt2.id, true, true); // 100%, passes
 
     const outcome = await getQuizOutcome(session, quiz.id);
-    expect(outcome).toEqual({ attemptsUsed: 2, bestScore: 100, passed: true, status: "PASSED" });
+    expect(outcome).toEqual({ attemptsUsed: 2, attemptsAllowed: 2, bestScore: 100, passed: true, status: "PASSED" });
   });
 });
 
@@ -111,7 +111,7 @@ describe("getQuizOutcome: FAILED_FINAL_ATTEMPT is informational only (open item 
 
   it("reports FAILED_FINAL_ATTEMPT with the best (still failing) score", async () => {
     const outcome = await getQuizOutcome(session, failedQuiz.id);
-    expect(outcome).toEqual({ attemptsUsed: 2, bestScore: 50, passed: false, status: "FAILED_FINAL_ATTEMPT" });
+    expect(outcome).toEqual({ attemptsUsed: 2, attemptsAllowed: 2, bestScore: 50, passed: false, status: "FAILED_FINAL_ATTEMPT" });
   });
 
   it("still just enforces the plain 2-attempt cap — no extra consequence wired", async () => {

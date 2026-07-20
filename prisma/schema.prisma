@@ -47,6 +47,9 @@ model User {
   gradedAnswers     AttemptAnswer[]    @relation("AttemptAnswerGradedBy")
   certificates      Certificate[]
 
+  attemptCapOverrides        AttemptCapOverride[] @relation("AttemptCapOverrideUser")
+  grantedAttemptCapOverrides AttemptCapOverride[] @relation("AttemptCapOverrideGrantedBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -159,6 +162,8 @@ model Quiz {
   questions Question[]
   attempts  Attempt[]
 
+  attemptCapOverrides AttemptCapOverride[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -263,6 +268,31 @@ enum AttemptStatus {
   SUBMITTED
   AUTO_SUBMITTED
   PENDING_MANUAL_GRADE
+}
+
+// Roles table (CLAUDE.md): Admin "can override attempts". Each row grants
+// one trainee extra attempts on one quiz beyond the immutable default cap
+// of 2 (T-3/T-20 — the default itself never changes; see
+// src/lib/admin/attempt-override.ts). Grants are append-only with a reason,
+// so the full override history stays auditable alongside the AuditLog entry.
+// Deliberately does NOT decide open item #1 (what happens after both
+// attempts fail): a grant simply raises the cap, which returns the trainee
+// to attempts-remaining.
+model AttemptCapOverride {
+  id            String @id @default(cuid())
+  userId        String
+  user          User   @relation("AttemptCapOverrideUser", fields: [userId], references: [id], onDelete: Cascade)
+  quizId        String
+  quiz          Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  extraAttempts Int    @default(1)
+  reason        String
+  grantedById   String
+  grantedBy     User   @relation("AttemptCapOverrideGrantedBy", fields: [grantedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, quizId])
+  @@map("attempt_cap_overrides")
 }
 
 // T-19: trainee id, quiz id, timestamp, answers, score, outcome all live

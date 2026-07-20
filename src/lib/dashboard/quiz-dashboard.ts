@@ -2,6 +2,7 @@ import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth/rbac";
 import { NotFoundError } from "@/lib/errors";
+import { getAllowedAttempts } from "@/lib/admin/attempt-override";
 import { syncExpiry } from "@/lib/quiz/attempt-lifecycle";
 import { computeQuizOutcome, type QuizOutcome } from "@/lib/quiz/outcome";
 
@@ -54,7 +55,8 @@ export async function getQuizDashboard(session: Session | null, quizId: string):
     trainees.map(async (trainee) => {
       const attempts = await prisma.attempt.findMany({ where: { userId: trainee.id, quizId } });
       const synced = await Promise.all(attempts.map((a) => syncExpiry(a.id)));
-      const outcome = computeQuizOutcome(synced);
+      const attemptsAllowed = await getAllowedAttempts(trainee.id, quizId);
+      const outcome = computeQuizOutcome(synced, attemptsAllowed);
       const onAttempt2 = synced.some((a) => a.attemptNumber === 2);
       return { trainee, onAttempt2, ...outcome };
     }),
