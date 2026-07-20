@@ -120,6 +120,25 @@ touching the related code.
   attemptId would have no independent safeguard against acting on another
   trainee's attempt.
 
+## Slice 5 decisions (question bank)
+
+Confirmed engineering decisions for the question-bank/AI-draft/approval
+workflow, recorded here so they don't get re-litigated:
+
+- Every question starts as `DRAFT` regardless of origin — AI-drafted and
+  manually-authored questions both require an explicit approve step; no
+  bypass for manual authorship by an Admin.
+- Editing an already-approved question resets it to `DRAFT`, requiring
+  fresh approval — matches "no auto-publish path, no exceptions."
+- AI-draft output validation is **partial success, not all-or-nothing**:
+  valid drafted items are created as `DRAFT` questions; malformed items
+  (unsupported type, missing/mismatched correct option, empty
+  prompt/options) are skipped and never persisted. Rejections are **logged
+  to `AuditLog`** (quizId, count requested, count created, the rejected
+  array with input + reason per item) rather than silently dropped, so
+  there's a durable record even before a question-bank UI exists to
+  surface them live.
+
 ## Stack
 
 Not specified in the source requirements. Before scaffolding anything,

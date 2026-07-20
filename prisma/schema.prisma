@@ -41,6 +41,9 @@ model User {
   auditLogs         AuditLog[]
   lessonCompletions LessonCompletion[]
   attempts          Attempt[]
+  createdQuestions  Question[]         @relation("QuestionCreatedBy")
+  approvedQuestions Question[]         @relation("QuestionApprovedBy")
+  questionRevisions QuestionRevision[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -161,12 +164,29 @@ model Quiz {
 
 // T-17: only the auto-gradable types are modeled here. Scenario/free-text/
 // mock-call (T-18, manually graded) are slice 6's concern. Question is
-// quiz-owned for now — slice 5 adds status (draft/approved/retired) and
-// version history onto this same table; T-14's sector/skill-type/unit tags
-// stay derivable via quiz.lesson.unit rather than being duplicated here.
+// quiz-owned; T-14's sector/skill-type/unit tags stay derivable via
+// quiz.lesson.unit rather than being duplicated here.
 enum QuestionType {
   MCQ
   TRUE_FALSE
+}
+
+// T-10/T-11/T-12/NFR-06: every question starts DRAFT regardless of origin —
+// AI-drafted and manually-authored both require the same explicit approve
+// step (CLAUDE.md "Slice 5 decisions"). Editing an APPROVED question resets
+// it to DRAFT, requiring fresh approval — no auto-publish path, no
+// exceptions. REJECTED is permanent and distinct from RETIRED (a question
+// that was once approved and later withdrawn).
+enum QuestionStatus {
+  DRAFT
+  APPROVED
+  RETIRED
+  REJECTED
+}
+
+enum QuestionSource {
+  MANUAL
+  AI_DRAFT
 }
 
 model Question {
@@ -180,12 +200,46 @@ model Question {
   options       Json
   correctOption String
 
+  status QuestionStatus @default(DRAFT)
+  source QuestionSource @default(MANUAL)
+
+  createdById  String?
+  createdBy    User?     @relation("QuestionCreatedBy", fields: [createdById], references: [id])
+  approvedById String?
+  approvedBy   User?     @relation("QuestionApprovedBy", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+
   attemptAnswers AttemptAnswer[]
+  revisions      QuestionRevision[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("questions")
+}
+
+// T-15/NFR-13: append-only pre-edit snapshot, taken before each edit is
+// applied to the live Question row above — "prior versions viewable" reads
+// from here. "Restorable" re-enters the normal edit path (archives current
+// content as a new revision, applies the chosen old content, resets status
+// to DRAFT) rather than being a special bypass.
+model QuestionRevision {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  type          QuestionType
+  prompt        String
+  options       Json
+  correctOption String
+  status        QuestionStatus
+
+  editedById String?
+  editedBy   User?   @relation(fields: [editedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("question_revisions")
 }
 
 enum AttemptStatus {

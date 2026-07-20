@@ -35,12 +35,12 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | T-7 | A quiz unlocks only after its associated lesson is marked complete | Phase 1 | Done | src/lib/content/lesson-completion.ts, src/lib/content/quiz-unlock.ts | src/lib/content/lesson-completion.test.ts, src/lib/content/quiz-unlock.test.ts |
 | T-8 | Quiz surfaces to the trainee without requiring manual notification fro | Phase 1 | Done (unlock state is computed on read — nothing to manually surface) | src/lib/content/quiz-unlock.ts | src/lib/content/quiz-unlock.test.ts |
 | T-9 | Trainee can start a quiz only when prior required content/quizzes are  | Phase 1 | Partial — touches open item #3b (does this mean sequential ordering across a sector, not just this one lesson? pending CEO confirmation) | src/lib/content/quiz-unlock.ts | src/lib/content/quiz-unlock.test.ts |
-| T-10 | AI drafts candidate questions per lesson/topic | Phase 1 | Not started | | |
+| T-10 | AI drafts candidate questions per lesson/topic | Phase 1 | Done — held pending manual live-provider verification before considered fully closed | src/lib/ai/drafter.ts, src/lib/questions/draft.ts | src/lib/questions/draft.test.ts |
 | T-11 | Every AI-drafted question requires human review | Phase 1 | Not started | | |
 | T-12 | Only approved questions are eligible to be served in a live quiz | Phase 1 | Not started | | |
 | T-13 | Trainer/Training Manager can manually add, edit, or retire questions | Phase 1 | Not started | | |
-| T-14 | Questions tagged by sector, skill type, unit, and question type | Phase 1 | Not started | | |
-| T-15 | Question bank supports versioning without altering historical results | Phase 1 | Not started | | |
+| T-14 | Questions tagged by sector, skill type, unit, and question type | Phase 1 | Done (derived via quiz.lesson.unit, not duplicated on Question) | prisma/schema.prisma | src/lib/questions/schema.smoke.test.ts |
+| T-15 | Question bank supports versioning without altering historical results | Phase 1 | Partial (QuestionRevision table + relations exist; the edit/restore workflow that writes to it is slice 5d) | prisma/schema.prisma | src/lib/questions/schema.smoke.test.ts |
 | T-16 | Engine assembles a quiz from approved questions matching the trainee's | Phase 1 | Partial (each quiz has a fixed question set owned directly by it, not a dynamically-matched pool — approval/versioning workflow itself is slice 5) | prisma/schema.prisma, src/lib/quiz/start-attempt.ts | src/lib/quiz/start-attempt.test.ts |
 | T-17 | Objective question types (MCQ, true/false) are auto-graded | Phase 1 | Done | src/lib/quiz/scoring.ts, src/lib/quiz/attempt-lifecycle.ts | src/lib/quiz/scoring.test.ts, src/lib/quiz/attempt-flow.test.ts |
 | T-18 | Scenario / free-text items are routed to the Trainer for manual gradin | Phase 1 | Not started (slice 6) | | |
@@ -67,7 +67,7 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | NFR-03 | HTTPS/TLS everywhere | - | Not started (deployment concern) | | |
 | NFR-04 | Session timeout and re-authentication after prolonged inactivity | - | Done | src/auth.ts, src/lib/auth/session-policy.ts | src/auth.session-expiry.test.ts |
 | NFR-05 | Audit trail of Admin actions (user creation, sector/role assignment, c | - | Started (sector reassignment audited; other admin actions add their own call sites as built) | src/lib/audit/log.ts, prisma/schema.prisma | src/lib/admin/assign-sector.test.ts |
-| NFR-06 | Any AI-generated content — quiz questions, future AI evaluations — pas | - | Not started | | |
+| NFR-06 | Any AI-generated content — quiz questions, future AI evaluations — pas | - | Partial (AI-drafted questions always land as DRAFT, never pre-approved; the approve action itself is slice 5c, and quiz assembly doesn't yet filter to APPROVED-only — that's 5e) | src/lib/questions/draft.ts | src/lib/questions/draft.test.ts |
 | NFR-07 | Video streams smoothly on standard office bandwidth without significan | - | Not started | | |
 | NFR-08 | Dashboards, reports, auto-grading, and aggregate views load within a f | - | Not started | | |
 | NFR-09 | Arabic-only interface, consistent terminology across the LMS, Knowledg | - | Partial (base RTL layout + login/home stub; full coverage grows with each slice) | src/app/layout.tsx, src/app/login/page.tsx, src/app/page.tsx | manual (dev server smoke test) |
