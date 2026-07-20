@@ -3,6 +3,7 @@ import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError } from "@/lib/errors";
 import { markLessonComplete } from "@/lib/content/lesson-completion";
+import { createQuestion, retireQuestion } from "@/lib/questions/manage";
 import { startAttempt } from "./start-attempt";
 import { createEphemeralQuiz, deleteEphemeralQuiz } from "./attempt-test-fixtures";
 
@@ -109,5 +110,61 @@ describe("startAttempt: abandoned expired attempt doesn't block the next one", (
     expect(finalizedAttempt1.status).toBe("AUTO_SUBMITTED");
     expect(finalizedAttempt1.submittedAt).not.toBeNull();
     expect(finalizedAttempt1.score).not.toBeNull();
+  });
+});
+
+describe("startAttempt: only APPROVED questions are ever served (T-12, T-16, slice 5e)", () => {
+  let trainee: { id: string };
+  let admin: { id: string };
+  let lesson: { id: string };
+  let quiz: { id: string };
+  let session: Session;
+
+  beforeAll(async () => {
+    trainee = await prisma.user.findUniqueOrThrow({ where: { email: "trainee@example.com" } });
+    admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@example.com" } });
+    session = sessionFor(trainee.id, "TRAINEE");
+    const fixture = await createEphemeralQuiz("سؤال 5هـ: أسئلة معتمدة فقط", 600);
+    lesson = fixture.lesson;
+    quiz = fixture.quiz;
+    await markLessonComplete(session, lesson.id);
+  });
+
+  afterAll(async () => {
+    await deleteEphemeralQuiz(lesson.id);
+  });
+
+  it("snapshots only APPROVED questions, skipping a DRAFT one on the same quiz", async () => {
+    const adminSession = sessionFor(admin.id, "ADMIN");
+    const draft = await createQuestion(adminSession, quiz.id, {
+      type: "MCQ",
+      prompt: "سؤال مسودة لم تتم الموافقة عليه بعد",
+      options: [
+        { id: "a", text: "أ" },
+        { id: "b", text: "ب" },
+      ],
+      correctOption: "a",
+    });
+
+    const attempt = await startAttempt(session, quiz.id);
+    const answers = await prisma.attemptAnswer.findMany({ where: { attemptId: attempt.id } });
+    expect(answers).toHaveLength(2); // the 2 pre-approved fixture questions, not the draft
+    expect(answers.some((a) => a.questionId === draft.id)).toBe(false);
+  });
+
+  it("refuses to start a quiz with zero approved questions", async () => {
+    const noneApprovedFixture = await createEphemeralQuiz("سؤال 5هـ: بلا أسئلة معتمدة", 600);
+    await markLessonComplete(session, noneApprovedFixture.lesson.id);
+    const adminSession = sessionFor(admin.id, "ADMIN");
+    const questions = await prisma.question.findMany({ where: { quizId: noneApprovedFixture.quiz.id } });
+    for (const question of questions) {
+      await retireQuestion(adminSession, question.id); // approved -> retired, so 0 remain eligible
+    }
+
+    await expect(startAttempt(session, noneApprovedFixture.quiz.id)).rejects.toThrow(
+      "Quiz has no approved questions yet",
+    );
+
+    await deleteEphemeralQuiz(noneApprovedFixture.lesson.id);
   });
 });

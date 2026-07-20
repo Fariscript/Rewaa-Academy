@@ -14,8 +14,16 @@ const MAX_ATTEMPTS = 2;
 export async function startAttempt(session: Session | null, quizId: string) {
   if (!session?.user) throw new UnauthenticatedError();
 
-  const quiz = await prisma.quiz.findUnique({ where: { id: quizId }, include: { questions: true } });
+  // T-12/T-16: only approved questions are eligible to be served in a live
+  // quiz — drafts, retired, and rejected questions never reach a trainee.
+  const quiz = await prisma.quiz.findUnique({
+    where: { id: quizId },
+    include: { questions: { where: { status: "APPROVED" } } },
+  });
   if (!quiz) throw new NotFoundError("Quiz not found");
+  if (quiz.questions.length === 0) {
+    throw new ForbiddenError("Quiz has no approved questions yet");
+  }
 
   const unlocked = await isQuizUnlocked(session, quizId); // also re-validates sector access
   if (!unlocked) throw new ForbiddenError("Quiz is locked — complete the lesson first");

@@ -202,6 +202,8 @@ async function seedUsers() {
 }
 
 async function seedTaxonomy() {
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@example.com" } });
+
   for (const sectorFixture of FIXTURE_TAXONOMY) {
     const sector = await prisma.sector.upsert({
       where: { name: sectorFixture.sector },
@@ -247,6 +249,8 @@ async function seedTaxonomy() {
               where: { quizId: quiz.id, prompt: questionFixture.prompt },
             });
             if (!existingQuestion) {
+              // APPROVED: fixture content is meant to be immediately usable
+              // for local dev/manual testing, not sitting in a review queue.
               await prisma.question.create({
                 data: {
                   quizId: quiz.id,
@@ -254,6 +258,9 @@ async function seedTaxonomy() {
                   prompt: questionFixture.prompt,
                   options: questionFixture.options,
                   correctOption: questionFixture.correctOption,
+                  status: "APPROVED",
+                  approvedById: admin.id,
+                  approvedAt: new Date(),
                 },
               });
             }

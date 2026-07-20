@@ -6,10 +6,13 @@ import { prisma } from "@/lib/prisma";
 // attempts against the same quiz (vitest runs test files concurrently).
 export async function createEphemeralQuiz(lessonTitle: string, timeLimitSeconds = 600) {
   const unit = await prisma.unit.findFirstOrThrow({ where: { name: "أول مكالمة" } });
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@example.com" } });
   const lesson = await prisma.lesson.create({ data: { title: lessonTitle, unitId: unit.id } });
   const quiz = await prisma.quiz.create({
     data: { lessonId: lesson.id, title: `اختبار: ${lessonTitle}`, timeLimitSeconds },
   });
+  // APPROVED: slice 4's attempt-lifecycle tests need real usable content —
+  // start-attempt.ts (slice 5e) only ever serves APPROVED questions.
   await prisma.question.createMany({
     data: [
       {
@@ -21,6 +24,9 @@ export async function createEphemeralQuiz(lessonTitle: string, timeLimitSeconds 
           { id: "b", text: "إجابة خاطئة" },
         ],
         correctOption: "a",
+        status: "APPROVED",
+        approvedById: admin.id,
+        approvedAt: new Date(),
       },
       {
         quizId: quiz.id,
@@ -31,6 +37,9 @@ export async function createEphemeralQuiz(lessonTitle: string, timeLimitSeconds 
           { id: "false", text: "خطأ" },
         ],
         correctOption: "true",
+        status: "APPROVED",
+        approvedById: admin.id,
+        approvedAt: new Date(),
       },
     ],
   });
