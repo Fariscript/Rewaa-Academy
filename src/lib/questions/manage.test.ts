@@ -67,6 +67,16 @@ describe("createQuestion / editQuestion / retireQuestion", () => {
       expect(question.source).toBe("MANUAL");
       expect(question.createdById).toBe(admin.id);
     });
+
+    it("audits question_created with the right actor and target (NFR-05)", async () => {
+      const question = await createQuestion(sessionFor(admin.id, "ADMIN"), quiz.id, validContent);
+      const audit = await prisma.auditLog.findFirst({
+        where: { action: "question_created", targetId: question.id },
+      });
+      expect(audit).toBeDefined();
+      expect(audit?.actorId).toBe(admin.id);
+      expect(audit?.targetType).toBe("Question");
+    });
   });
 
   describe("editQuestion", () => {
@@ -133,6 +143,18 @@ describe("createQuestion / editQuestion / retireQuestion", () => {
       expect(edited.type).toBe("FREE_TEXT");
       expect(edited.options).toBeNull();
       expect(edited.correctOption).toBeNull();
+    });
+
+    it("audits question_edited with the right actor and target (NFR-05)", async () => {
+      const question = await createQuestion(sessionFor(admin.id, "ADMIN"), quiz.id, validContent);
+      await editQuestion(sessionFor(admin.id, "ADMIN"), question.id, { ...validContent, prompt: "معدّل للتدقيق" });
+
+      const audit = await prisma.auditLog.findFirst({
+        where: { action: "question_edited", targetId: question.id },
+      });
+      expect(audit).toBeDefined();
+      expect(audit?.actorId).toBe(admin.id);
+      expect(audit?.targetType).toBe("Question");
     });
   });
 

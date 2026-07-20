@@ -17,7 +17,7 @@ export async function createQuestion(session: Session | null, quizId: string, in
   const result = validateQuestionContent(input);
   if (!result.ok) throw new ForbiddenError(`Invalid question content: ${result.reason}`);
 
-  return prisma.question.create({
+  const created = await prisma.question.create({
     data: {
       quizId,
       type: result.value.type,
@@ -29,6 +29,10 @@ export async function createQuestion(session: Session | null, quizId: string, in
       createdById: session.user.id,
     },
   });
+
+  await recordAudit(session.user.id, "question_created", "Question", created.id, { quizId });
+
+  return created;
 }
 
 // T-15/NFR-13: archives the pre-edit content as a QuestionRevision, then
@@ -48,7 +52,7 @@ export async function editQuestion(session: Session | null, questionId: string, 
   const result = validateQuestionContent(input);
   if (!result.ok) throw new ForbiddenError(`Invalid question content: ${result.reason}`);
 
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     await tx.questionRevision.create({
       data: {
         questionId,
@@ -78,6 +82,13 @@ export async function editQuestion(session: Session | null, questionId: string, 
       },
     });
   });
+
+  // Outside the transaction, same as approveQuestion/rejectQuestion/
+  // retireQuestion — recordAudit uses the plain (non-transactional) prisma
+  // client, matching the existing pattern in this file.
+  await recordAudit(session.user.id, "question_edited", "Question", questionId, { quizId: question.quizId });
+
+  return updated;
 }
 
 // T-13: retire — withdraws a question that was DRAFT or APPROVED. Distinct
