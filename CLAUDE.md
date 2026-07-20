@@ -139,6 +139,32 @@ workflow, recorded here so they don't get re-litigated:
   there's a durable record even before a question-bank UI exists to
   surface them live.
 
+## Blocked
+
+- **Slice 5b (AI-draft generation) is held incomplete**, not on a code
+  issue — it's blocked on a real `ANTHROPIC_API_KEY` not yet being
+  available (one will be provided later). Code and tests are done
+  (`src/lib/ai/drafter.ts`, `src/lib/questions/draft.ts`,
+  `src/lib/questions/draft.test.ts`), and the failure path has been
+  confirmed against the **real** Anthropic API — an invalid key produced a
+  genuine 401, which `anthropicDrafter` correctly caught and normalized to
+  `AiProviderError` rather than an uncaught crash. What's still unverified
+  is the **success path**: real question generation, real JSON parsing,
+  real validation against genuine (not injected-fake) model output.
+  **Do not start slice 5c/5d/5e until this closes** — they don't
+  technically depend on it, but slice 5 is being built in order and
+  further question-bank work shouldn't stack on top of an unverified
+  piece.
+
+  To verify once a key exists, run from the Academy project root:
+  ```
+  ANTHROPIC_API_KEY=<real key> \
+  DATABASE_URL="postgresql://engineer@localhost:5432/rewaa_academy_dev?schema=public" \
+  npx tsx scripts/verify-ai-drafter.ts
+  ```
+  Script: `scripts/verify-ai-drafter.ts` (not run by tests/CI — needs a real
+  key and writes real rows to the dev DB).
+
 ## Stack
 
 Not specified in the source requirements. Before scaffolding anything,
