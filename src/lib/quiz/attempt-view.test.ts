@@ -6,7 +6,7 @@ import { markLessonComplete } from "@/lib/content/lesson-completion";
 import { startAttempt } from "./start-attempt";
 import { saveAnswers } from "./save-answers";
 import { submitAttempt } from "./submit-attempt";
-import { getAttemptForTrainee, toTraineeAttemptView } from "./attempt-view";
+import { getAttemptForTrainee, getQuizResultForTrainee, toTraineeAttemptView } from "./attempt-view";
 import { createEphemeralQuiz, deleteEphemeralQuiz } from "./attempt-test-fixtures";
 
 function sessionFor(id: string, role: Session["user"]["role"]): Session {
@@ -92,6 +92,60 @@ describe("getAttemptForTrainee: ownership, redaction, lazy expiry", () => {
     const mcqAnswer = view.answers.find((a) => a.questionType === "MCQ");
     expect(mcqAnswer?.isCorrect).toBe(true); // visible once finalized
     expect(JSON.stringify(view)).not.toContain("correctOption");
+  });
+});
+
+describe("getQuizResultForTrainee: the result page's single read", () => {
+  let trainee: { id: string };
+  let lesson: { id: string };
+  let quiz: { id: string };
+  let session: Session;
+
+  beforeAll(async () => {
+    trainee = await prisma.user.findUniqueOrThrow({ where: { email: "trainee@example.com" } });
+    session = sessionFor(trainee.id, "TRAINEE");
+    const fixture = await createEphemeralQuiz("سؤال 12: صفحة النتيجة", 600);
+    lesson = fixture.lesson;
+    quiz = fixture.quiz;
+    await markLessonComplete(session, lesson.id);
+  });
+
+  afterAll(async () => {
+    await deleteEphemeralQuiz(lesson.id);
+  });
+
+  it("bundles outcome, quiz meta, and redacted per-attempt views", async () => {
+    const attempt = await startAttempt(session, quiz.id);
+    const rows = await prisma.attemptAnswer.findMany({ where: { attemptId: attempt.id } });
+    const mcq = rows.find((r) => r.questionType === "MCQ")!;
+    const trueFalse = rows.find((r) => r.questionType === "TRUE_FALSE")!;
+    await saveAnswers(session, attempt.id, [
+      { questionId: mcq.questionId!, selectedOption: "a" },
+      { questionId: trueFalse.questionId!, selectedOption: "true" },
+    ]);
+    await submitAttempt(session, attempt.id);
+
+    const result = await getQuizResultForTrainee(session, quiz.id);
+    expect(result.lessonId).toBe(lesson.id);
+    expect(result.outcome.status).toBe("PASSED");
+    expect(result.outcome.bestScore).toBe(100);
+    expect(result.attempts).toHaveLength(1);
+    expect(result.attempts[0].status).toBe("SUBMITTED");
+    expect(result.attempts[0].answers.every((a) => a.isCorrect === true)).toBe(true);
+    expect(JSON.stringify(result)).not.toContain("correctOption");
+  });
+
+  it("keeps the sector scope check (a trainee outside the sector is rejected)", async () => {
+    const outsider = await prisma.user.create({
+      data: { email: "outsider-slice12@example.com", name: "خارج القطاع", role: "TRAINEE" },
+    });
+    try {
+      await expect(getQuizResultForTrainee(sessionFor(outsider.id, "TRAINEE"), quiz.id)).rejects.toThrow(
+        ForbiddenError,
+      );
+    } finally {
+      await prisma.user.delete({ where: { id: outsider.id } });
+    }
   });
 });
 

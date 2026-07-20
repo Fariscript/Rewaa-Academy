@@ -3,6 +3,7 @@ import type { Attempt, AttemptAnswer, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, NotFoundError, UnauthenticatedError } from "@/lib/errors";
 import { syncExpiry } from "./attempt-lifecycle";
+import { getQuizOutcome, type QuizOutcome } from "./outcome";
 
 // The ONLY shape of an attempt that may reach a trainee — as a route's JSON
 // body or as a server-component prop (RSC props serialize to the client).
@@ -69,6 +70,41 @@ export function toTraineeAttemptView(
       isCorrect: inProgress ? null : a.isCorrect,
       feedback: inProgress ? null : a.feedback,
     })),
+  };
+}
+
+export interface TraineeQuizResult {
+  quizId: string;
+  quizTitle: string;
+  lessonId: string;
+  outcome: QuizOutcome;
+  // Every attempt (finalized and open), oldest first, already redacted.
+  attempts: TraineeAttemptView[];
+}
+
+// Everything the result page renders in one read. getQuizOutcome performs
+// the sector scope check and lazy expiry sync; the attempt list is then
+// inherently ownership-scoped by the userId filter.
+export async function getQuizResultForTrainee(session: Session | null, quizId: string): Promise<TraineeQuizResult> {
+  if (!session?.user) throw new UnauthenticatedError();
+
+  const outcome = await getQuizOutcome(session, quizId);
+  const quiz = await prisma.quiz.findUniqueOrThrow({
+    where: { id: quizId },
+    select: { title: true, lessonId: true },
+  });
+  const attempts = await prisma.attempt.findMany({
+    where: { userId: session.user.id, quizId },
+    orderBy: { attemptNumber: "asc" },
+    include: { answers: { orderBy: { id: "asc" } }, quiz: true },
+  });
+
+  return {
+    quizId,
+    quizTitle: quiz.title,
+    lessonId: quiz.lessonId,
+    outcome,
+    attempts: attempts.map(toTraineeAttemptView),
   };
 }
 
