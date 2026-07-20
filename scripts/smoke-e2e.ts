@@ -26,6 +26,13 @@
  *      visit → PDF magic bytes → public verify with no session
  *   6. grading: FREE_TEXT question → attempt parks PENDING_MANUAL_GRADE →
  *      grade via API → attempt honestly STAYS pending (T-26 gated)
+ *   7. admin dashboard (browser): quiz catalog → per-quiz dashboard →
+ *      failed-both flag → grant-extra-attempt click-through with reason →
+ *      flag clears, audit row written, trainee can start attempt 3
+ *   8. grading UI (browser): pending answer visible → grade via the form →
+ *      queue empties, attempt honestly stays pending
+ *   9. sector select (browser): optimistic value during the PATCH
+ *      round-trip, persisted assignment, then restored
  */
 import { randomBytes } from "node:crypto";
 import { Client } from "pg";
@@ -121,6 +128,46 @@ async function passAttempt(ctx: Ctx, quizId: string): Promise<{ attemptId: strin
     await fetch(`${BASE}/api/attempts/${attemptId}/submit`, { method: "POST", headers: ctx.traineeCookie })
   ).json();
   return { attemptId, passed: submit.attempt.passed === true };
+}
+
+// Fails an attempt on purpose: every auto-graded answer gets a wrong option.
+async function failAttempt(ctx: Ctx, quizId: string): Promise<string> {
+  const start = await fetch(`${BASE}/api/quizzes/${quizId}/attempts`, { method: "POST", headers: ctx.traineeCookie });
+  const startBody = await start.json();
+  if (!start.ok) throw new Error(`startAttempt (fail path): ${JSON.stringify(startBody)}`);
+  const attemptId: string = startBody.attempt.id;
+  const rows = await ctx.db.query(
+    'SELECT "questionId", "questionType", options, "correctOption" FROM attempt_answers WHERE "attemptId"=$1',
+    [attemptId],
+  );
+  const payload = rows.rows
+    .filter((a) => a.questionType === "MCQ" || a.questionType === "TRUE_FALSE")
+    .map((a) => ({
+      questionId: a.questionId,
+      selectedOption: a.options.find((o: { id: string }) => o.id !== a.correctOption).id,
+    }));
+  await fetch(`${BASE}/api/attempts/${attemptId}/answers`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", ...ctx.traineeCookie },
+    body: JSON.stringify({ answers: payload }),
+  });
+  await fetch(`${BASE}/api/attempts/${attemptId}/submit`, { method: "POST", headers: ctx.traineeCookie });
+  return attemptId;
+}
+
+type Browser = Awaited<ReturnType<(typeof import("playwright-core"))["chromium"]["launch"]>>;
+
+async function adminPage(ctx: Ctx, browser: Browser) {
+  const context = await browser.newContext();
+  await context.addCookies([
+    {
+      name: "authjs.session-token",
+      value: ctx.adminCookie.cookie.split("=")[1],
+      domain: new URL(BASE).hostname,
+      path: "/",
+    },
+  ]);
+  return context.newPage();
 }
 
 async function stageAuthAndHome(ctx: Ctx) {
@@ -332,6 +379,118 @@ async function stageGrading(ctx: Ctx, lesson: { id: string; quizId: string }) {
   }
 }
 
+async function stageAdminDashboardBrowser(ctx: Ctx, browser: Browser, lesson: { id: string; quizId: string }) {
+  // Fresh scenario: trainee fails both attempts → FAILED_FINAL_ATTEMPT.
+  await resetTraineeState(ctx.db);
+  ctx.traineeCookie = { cookie: `authjs.session-token=${await forgeSession(ctx.db, "trainee@example.com")}` };
+  ctx.adminCookie = { cookie: `authjs.session-token=${await forgeSession(ctx.db, "admin@example.com")}` };
+  await fetch(`${BASE}/api/lessons/${lesson.id}/complete`, { method: "POST", headers: ctx.traineeCookie });
+  await failAttempt(ctx, lesson.quizId);
+  await failAttempt(ctx, lesson.quizId);
+
+  const page = await adminPage(ctx, browser);
+  await page.goto(`${BASE}/admin/quizzes`);
+  await page.waitForSelector("text=الأسئلة المعتمدة");
+  await page.locator(`a[href='/admin/quizzes/${lesson.quizId}']`).click();
+  await page.waitForSelector("text=أخفقوا في المحاولتين");
+
+  const flagTile = page.locator("div", { hasText: /^1أخفقوا في المحاولتين$/ });
+  if ((await flagTile.count()) > 0) pass("dashboard-flag", "failed-both tile shows 1");
+  else fail("dashboard-flag", "failed-both tile not showing 1");
+
+  await page.getByRole("button", { name: "منح محاولة إضافية" }).click();
+  await page.locator("input[placeholder='السبب (إلزامي)']").fill("سماح دخاني بمحاولة ثالثة");
+  await page.getByRole("button", { name: "تأكيد" }).click();
+  // Success closes the form (the reason input disappears) and
+  // router.refresh() re-renders the row without the grant button.
+  await page.waitForSelector("input[placeholder='السبب (إلزامي)']", { state: "detached", timeout: 10000 });
+  await page.waitForSelector("text=منح محاولة إضافية", { state: "detached", timeout: 10000 });
+  pass("override-clickthrough", "grant confirmed and flag cleared");
+
+  const audit = await ctx.db.query(
+    `SELECT id FROM audit_logs WHERE action='attempt_cap_override_granted' ORDER BY "createdAt" DESC LIMIT 1`,
+  );
+  if (audit.rows.length > 0) pass("override-audit", "audit row written");
+  else fail("override-audit", "no attempt_cap_override_granted audit row");
+
+  const third = await fetch(`${BASE}/api/quizzes/${lesson.quizId}/attempts`, {
+    method: "POST",
+    headers: ctx.traineeCookie,
+  });
+  const thirdBody = await third.json();
+  if (third.ok && thirdBody.attempt.attemptNumber === 3) pass("override-attempt3", "trainee started attempt 3");
+  else fail("override-attempt3", JSON.stringify(thirdBody));
+  await page.close();
+}
+
+async function stageGradingBrowser(ctx: Ctx, browser: Browser, lesson: { id: string; quizId: string }) {
+  // A pending manual answer on the other quiz.
+  const created = await (
+    await fetch(`${BASE}/api/admin/quizzes/${lesson.quizId}/questions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...ctx.adminCookie },
+      body: JSON.stringify({ type: "FREE_TEXT", prompt: SMOKE_FREE_TEXT_PROMPT }),
+    })
+  ).json();
+  await fetch(`${BASE}/api/admin/questions/${created.question.id}/approve`, { method: "POST", headers: ctx.adminCookie });
+  await fetch(`${BASE}/api/lessons/${lesson.id}/complete`, { method: "POST", headers: ctx.traineeCookie });
+  const attemptId = await failAttempt(ctx, lesson.quizId); // wrong MCQ answers + unanswered FREE_TEXT → pending
+  await fetch(`${BASE}/api/attempts/${attemptId}/answers`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", ...ctx.traineeCookie },
+    body: JSON.stringify({ answers: [] }),
+  }).catch(() => {});
+
+  const page = await adminPage(ctx, browser);
+  await page.goto(`${BASE}/admin/grading`);
+  await page.waitForSelector(`text=${SMOKE_FREE_TEXT_PROMPT}`);
+  pass("grading-ui-queue", "pending answer visible");
+
+  await page.locator("label", { hasText: "إجابة صحيحة" }).first().click();
+  await page.locator("textarea").first().fill("تقييم دخاني عبر الواجهة.");
+  await page.getByRole("button", { name: "اعتماد التقييم" }).click();
+  await page.waitForSelector("text=لا توجد إجابات بانتظار التصحيح", { timeout: 10000 });
+  pass("grading-ui-form", "graded through the form; queue emptied");
+
+  const after = await ctx.db.query("SELECT status, score FROM attempts WHERE id=$1", [attemptId]);
+  if (after.rows[0].status === "PENDING_MANUAL_GRADE" && after.rows[0].score === null) {
+    pass("grading-ui-honesty", "attempt still pending after full grading (T-26 gated)");
+  } else {
+    fail("grading-ui-honesty", JSON.stringify(after.rows[0]));
+  }
+  await page.close();
+}
+
+async function stageSectorSelectBrowser(ctx: Ctx, browser: Browser) {
+  const sectors = await ctx.db.query("SELECT id, name FROM sectors ORDER BY name");
+  const original = sectors.rows.find((s) => s.name === "الخدمات");
+  const target = sectors.rows.find((s) => s.name !== "الخدمات");
+
+  const page = await adminPage(ctx, browser);
+  await page.goto(`${BASE}/admin/trainees`);
+  const select = page.locator("select").first();
+  if ((await select.inputValue()) !== original.id) {
+    fail("sector-select", "trainee not starting in الخدمات");
+    await page.close();
+    return;
+  }
+  await select.selectOption(target.id);
+  if ((await select.inputValue()) === target.id) pass("sector-select-optimistic", "picked value shown during PATCH");
+  else fail("sector-select-optimistic", "select snapped back during PATCH");
+
+  await page.waitForTimeout(2500);
+  const persisted = await ctx.db.query("SELECT \"sectorId\" FROM users WHERE email='trainee@example.com'");
+  if (persisted.rows[0].sectorId === target.id) pass("sector-select-persist", "assignment persisted");
+  else fail("sector-select-persist", "assignment did not persist");
+
+  await select.selectOption(original.id);
+  await page.waitForTimeout(2500);
+  const restored = await ctx.db.query("SELECT \"sectorId\" FROM users WHERE email='trainee@example.com'");
+  if (restored.rows[0].sectorId === original.id) pass("sector-select-restore", "trainee back in الخدمات");
+  else fail("sector-select-restore", "restore failed — fix manually: trainee should be in الخدمات");
+  await page.close();
+}
+
 async function main() {
   const db = new Client({ connectionString: databaseUrl });
   await db.connect();
@@ -354,6 +513,21 @@ async function main() {
     // lessons[0] has an attempt slot left (browser stage passed on attempt 1);
     // lessons[1] used both slots across the expiry + certificate stages.
     await stageGrading(ctx, lessons[0]);
+
+    if (CHROMIUM) {
+      const { chromium } = await import("playwright-core");
+      const browser = await chromium.launch({ executablePath: CHROMIUM });
+      try {
+        // Resets trainee state internally for the failed-both scenario.
+        await stageAdminDashboardBrowser(ctx, browser, lessons[0]);
+        await stageGradingBrowser(ctx, browser, lessons[1]);
+        await stageSectorSelectBrowser(ctx, browser);
+      } finally {
+        await browser.close();
+      }
+    } else {
+      console.log("SKIP admin-browser stages — SMOKE_CHROMIUM not set");
+    }
 
     // Leave the dev DB tidy for the next run/session.
     await db.query("DELETE FROM questions WHERE prompt=$1", [SMOKE_FREE_TEXT_PROMPT]);
