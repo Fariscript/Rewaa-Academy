@@ -29,7 +29,7 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | T-1 | A pop quiz appears after each lesson and is graded under the same rule | Phase 1 | Done | prisma/schema.prisma, prisma/seed.ts, src/lib/quiz/*.ts | src/lib/quiz/*.test.ts |
 | T-2 | Passing grade is 95% per quiz | Phase 1 | Done (exact-fraction comparison, no rounding — see open item #7) | src/lib/quiz/scoring.ts | src/lib/quiz/scoring.test.ts |
 | T-3 | 2 attempts per quiz | Phase 1 | Done (cap enforced unconditionally; consequence-after-both-fail is open item #1, stubbed) | src/lib/quiz/start-attempt.ts, src/lib/quiz/outcome.ts | src/lib/quiz/start-attempt.test.ts, src/lib/quiz/outcome.test.ts |
-| T-4 | Certificate auto-generated once all required quizzes are passed (name, | Phase 1 | Not started | | |
+| T-4 | Certificate auto-generated once all required quizzes are passed (name, | Phase 1 | Done (lazy on-access generation, same pattern as T-32's auto-submit — no background scheduler; downloadable PDF via src/lib/certificates/pdf.ts) | src/lib/certificates/certificate.ts, src/lib/certificates/pdf.ts | src/lib/certificates/certificate.test.ts, src/lib/certificates/pdf.test.ts |
 | T-5 | Quizzes are sector-dependent, following each sector's own content layo | Phase 1 | Done | src/lib/quiz/start-attempt.ts, src/lib/quiz/outcome.ts | src/lib/quiz/start-attempt.test.ts, src/lib/quiz/outcome.test.ts |
 | T-6 | Supported question types: multiple choice, true/false, sales scenarios | Phase 1 | Done | prisma/schema.prisma (QuestionType) | src/lib/questions/validate-content.test.ts |
 | T-7 | A quiz unlocks only after its associated lesson is marked complete | Phase 1 | Done | src/lib/content/lesson-completion.ts, src/lib/content/quiz-unlock.ts | src/lib/content/lesson-completion.test.ts, src/lib/content/quiz-unlock.test.ts |
@@ -53,7 +53,7 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | T-25 | Trainer can view submitted assignments/mock calls and enter a grade wi | Phase 1 | Done (Admin — role collapse) | src/lib/grading/grading.ts | src/lib/grading/grading.test.ts |
 | T-26 | Manually graded items follow the same 95% / 2-attempt logic as auto-gr | Phase 1 | Blocked — STOP, see CLAUDE.md open item #4. Per-item grades are captured (T-25) but nothing converts a fully-graded attempt into an overall score/passed; the attempt stays PENDING_MANUAL_GRADE indefinitely until that rule is decided. TODO(open-item-4) at src/lib/grading/grading.ts and src/lib/quiz/attempt-lifecycle.ts | | |
 | T-27 | Every attempt is attributed to a trainee via the existing Google SSO s | Phase 1 | Done | src/auth.ts, src/lib/quiz/start-attempt.ts | src/auth.session-expiry.test.ts, src/lib/quiz/start-attempt.test.ts |
-| T-28 | Certificate generation pulls trainee name and completion date from the | Phase 1 | Not started | | |
+| T-28 | Certificate generation pulls trainee name and completion date from the | Phase 1 | Done (name from User.name, sourced from Google SSO at login; completion date = latest passing attempt's submittedAt across required quizzes) | src/lib/certificates/certificate.ts | src/lib/certificates/certificate.test.ts |
 | T-29 | Practical/video test: trainee performs steps in-platform, AI grades th | Phase 2 | Not started | | |
 | T-30 | Voice-simulation test: AI plays a customer/lead, scores the trainee's  | Phase 2 | Not started | | |
 | T-31 | Voice quiz: AI agent asks the trainee a question aloud; trainee replie | Phase 2 | Not started | | |
@@ -79,5 +79,5 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | NFR-15 | Regular backups of user data, content, test results, question bank, an | - | Not started | | |
 | NFR-16 | Architecture supports adding sectors, sub-sectors, and content volume  | - | Partial (schema imposes no fixed limits; no load testing done) | prisma/schema.prisma | |
 | NFR-17 | Admins manage the full taxonomy (sectors, sub-sectors, paths) and Trai | - | Partial (Admin read-only taxonomy access; create/edit is FR-18's remaining gap) | src/lib/content/taxonomy.ts | src/lib/content/taxonomy.test.ts |
-| NFR-18 | Verifiable digital signature on certificates | - | Not started | | |
+| NFR-18 | Verifiable digital signature on certificates | - | Done (Ed25519, public verify endpoint) | src/lib/certificates/signing.ts, src/lib/certificates/verify.ts | src/lib/certificates/signing.test.ts, src/lib/certificates/verify.test.ts |
 | NFR-19 | Google Workspace SSO | - | Done | src/auth.ts | src/lib/auth/domain.test.ts |

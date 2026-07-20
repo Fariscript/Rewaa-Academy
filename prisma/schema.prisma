@@ -45,6 +45,7 @@ model User {
   approvedQuestions Question[]         @relation("QuestionApprovedBy")
   questionRevisions QuestionRevision[]
   gradedAnswers     AttemptAnswer[]    @relation("AttemptAnswerGradedBy")
+  certificates      Certificate[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -60,10 +61,11 @@ model User {
 
 // FR-05: top-level sectors (Services, Retail, Restaurants & Cafés, ...).
 model Sector {
-  id         String      @id @default(cuid())
-  name       String      @unique
-  subSectors SubSector[]
-  trainees   User[]
+  id           String        @id @default(cuid())
+  name         String        @unique
+  subSectors   SubSector[]
+  trainees     User[]
+  certificates Certificate[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -326,6 +328,32 @@ model AttemptAnswer {
 
   @@unique([attemptId, questionId])
   @@map("attempt_answers")
+}
+
+// T-4/T-28/NFR-18: issued once a trainee has passed every quiz in their
+// (current, at issuance time) sector. One per (user, sector) — issuing is
+// idempotent, re-checking eligibility after issuance just returns the
+// existing row rather than creating a duplicate. traineeName is a snapshot
+// (T-28 "pulls name... from the SSO identity profile" — User.name, sourced
+// from Google SSO at login) so a later name change doesn't retroactively
+// alter an already-issued certificate. signature is an Ed25519 signature
+// over the row's own canonical fields (src/lib/certificates/signing.ts) —
+// verifiable proof the record hasn't been tampered with since issuance.
+model Certificate {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sectorId String
+  sector   Sector @relation(fields: [sectorId], references: [id])
+
+  traineeName    String
+  completionDate DateTime
+  signature      String
+
+  issuedAt DateTime @default(now())
+
+  @@unique([userId, sectorId])
+  @@map("certificates")
 }
 
 // NFR-05: audit trail of Admin actions (user creation, sector/role

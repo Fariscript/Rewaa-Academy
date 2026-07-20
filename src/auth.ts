@@ -37,7 +37,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // the past, so an inactivity-expired session lands here as `auth: null`.
     authorized({ request, auth }) {
       const { pathname } = request.nextUrl;
-      const isPublic = pathname.startsWith("/login") || pathname.startsWith("/api/auth");
+      // NFR-18: certificate verification must be checkable by anyone
+      // holding a certificate (e.g. an employer), without an account.
+      const isCertificateVerify = /^\/api\/certificates\/[^/]+\/verify$/.test(pathname);
+      const isPublic = pathname.startsWith("/login") || pathname.startsWith("/api/auth") || isCertificateVerify;
       if (isPublic) return true;
       return Boolean(auth?.user);
     },
