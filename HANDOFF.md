@@ -65,6 +65,14 @@ placeholder home. A second build run closed that:
   PENDING_MANUAL_GRADE (cap still enforced; UI doesn't offer it);
   sector-select shows the old value while its PATCH is in flight.
 
+- **Perf sanity (NFR-08/NFR-16), measured 2026-07-20 via
+  `scripts/perf-sanity.ts`** (throwaway 301-trainee cohort, 600 finalized
+  attempts, dev server medians): per-quiz admin dashboard **~71ms** (was
+  ~1.0s before batching its per-trainee queries into one attempts read +
+  one override aggregate — commit history has the change), quiz catalog
+  ~28ms, trainee content API ~27ms, home SSR ~150ms. Re-run the script
+  after touching `src/lib/dashboard/` or `trainee-progress.ts`.
+
 Everything below is the original snapshot.
 
 ---
