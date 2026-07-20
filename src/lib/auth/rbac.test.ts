@@ -17,7 +17,6 @@ describe("requireRole", () => {
 
   it.each([
     ["TRAINEE", ["ADMIN"], false],
-    ["TRAINER_TRAINING_MANAGER", ["ADMIN"], false],
     ["ADMIN", ["ADMIN"], true],
   ] as const)("role=%s allowed=%s -> %s", (role, allowed, shouldPass) => {
     const session = sessionFor(role);
@@ -29,7 +28,7 @@ describe("requireRole", () => {
   });
 
   it("accepts any of several allowed roles", () => {
-    const session = sessionFor("TRAINER_TRAINING_MANAGER");
-    expect(() => requireRole(session, ["ADMIN", "TRAINER_TRAINING_MANAGER"])).not.toThrow();
+    const session = sessionFor("TRAINEE");
+    expect(() => requireRole(session, ["ADMIN", "TRAINEE"])).not.toThrow();
   });
 });

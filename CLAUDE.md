@@ -21,11 +21,11 @@ listed below as a dependency.
 - **Certificate** auto-generates once all required quizzes in a trainee's
   sector are passed. Pulls name + completion date from the SSO identity
   profile. Includes digital signature, downloadable PDF. (T-04, T-28)
-- **AI drafts quiz questions.** A Trainer/Training Manager must approve,
-  edit, or reject every single one before it can reach a trainee. This is a
-  hard gate — no auto-publish path, no exceptions. (T-10, T-11, T-12, NFR-06)
+- **AI drafts quiz questions.** An Admin must approve, edit, or reject every
+  single one before it can reach a trainee. This is a hard gate — no
+  auto-publish path, no exceptions. (T-10, T-11, T-12, NFR-06)
 - MCQ / true-false → auto-graded. Scenario / free-text / mock-call → routed
-  to a Trainer for manual grading with written feedback. (T-17, T-18, T-25)
+  to Admin for manual grading with written feedback. (T-17, T-18, T-25)
   ⚠️ Whether manual grading must also hit 95% is **unresolved** — see Open
   Items below. Don't hardcode an assumption.
 - **Content items and question-bank items both support versioning**: edit
@@ -34,23 +34,28 @@ listed below as a dependency.
 - Identity: **Google Workspace SSO only**, restricted to the company domain.
   No separate password auth for this platform. (FR-02, FR-03, T-27)
 - **Arabic-only UI.** (NFR-09)
-- **Dashboard is one shared component/route, role-gated — not two separate
-  builds.** Trainer/Training Manager sees: who's completed a quiz, who
-  hasn't, who's on attempt 2, average scores, a flag for anyone who failed
-  both attempts. Admin sees the same view, plus the admin-only controls
-  already listed in the Roles table layered on top (taxonomy management,
-  sector assign/reassign, attempt overrides) — no new admin capabilities
-  beyond what's already defined there. Still **basic in Phase 1 on
-  purpose** — do not build deeper analytics/trends early, that's explicitly
-  Phase 2. (T-21–T-24)
+- **Dashboard is a single Admin-only view** (there's only one non-Trainee
+  role now — see Roles below): who's completed a quiz, who hasn't, who's on
+  attempt 2, average scores, a flag for anyone who failed both attempts,
+  plus the taxonomy/sector-assignment/attempt-override controls Admin
+  already has. Still **basic in Phase 1 on purpose** — do not build deeper
+  analytics/trends early, that's explicitly Phase 2. (T-21–T-24)
 
 ## Roles
+
+Two roles only for now — confirmed, no separate Trainer/Training Manager.
+**Admin currently covers the company's Manager position, plus anyone else
+granted admin access.** This may re-split into a distinct Trainer/Training
+Manager role later — build permission checks accordingly: every role check
+goes through the single `requireRole()` gate (see `src/lib/auth/rbac.ts`),
+never a scattered `isAdmin()`-style boolean, so reintroducing a role later
+means adding one enum value and updating permission lists in one place,
+not hunting through every route.
 
 | Role | Can do |
 |---|---|
 | Trainee | Sector-scoped content + quizzes only; sees own attempts/scores; downloads own certificate |
-| Trainer / Training Manager | Approves question bank; grades manual submissions; views testing dashboard |
-| Admin | Manages taxonomy (sectors/sub-sectors/paths); assigns/reassigns trainees to sectors; can override attempts |
+| Admin | Manages taxonomy (sectors/sub-sectors/paths); assigns/reassigns trainees to sectors; can override attempts; approves question bank; grades manual submissions; views testing dashboard |
 
 ## Build order
 
@@ -83,8 +88,8 @@ roleplay (T-30), deeper dashboard analytics (T-24).
     unlock. Needs confirming with the CEO before Phase 1 launch — retrofitting
     order-enforcement after trainees already have unordered access is
     expensive to unwind.
-4. Does manual grading need to hit the same 95% bar, or is it trainer
-   judgment?
+4. Does manual grading need to hit the same 95% bar, or is it the grading
+   Admin's judgment?
 5. Notification rules (triggers, channels, wording) — not yet defined.
 6. FR-26 (Call Library & Evaluation) — flagged for a change in the latest
    meeting, but no detail was captured yet.
@@ -101,6 +106,19 @@ These are exactly the decisions that cause expensive rebuilds if guessed
 wrong. If a task depends on one, implement everything around it and leave
 the decision point clearly marked (e.g. a single config value or a TODO
 with the open-item number) rather than picking an assumption silently.
+
+## Known fragilities
+
+Not CEO decisions — internal engineering caveats worth grepping for before
+touching the related code.
+
+- `TODO(ownership-audit-1)` (`src/lib/quiz/attempt-lifecycle.ts`, both
+  `finalizeAttempt` and `syncExpiry`): these trust `attemptId` unconditionally
+  and have no ownership check of their own. No live bug — every current call
+  site already passes an attemptId that was pre-verified as belonging to the
+  caller — but a future route calling either directly with a client-supplied
+  attemptId would have no independent safeguard against acting on another
+  trainee's attempt.
 
 ## Stack
 

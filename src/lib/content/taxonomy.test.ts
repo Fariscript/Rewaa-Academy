@@ -14,7 +14,6 @@ function sessionFor(id: string, role: Session["user"]["role"]): Session {
 describe("getFullTaxonomy (GET /api/admin/sectors)", () => {
   it("rejects non-admin roles", async () => {
     await expect(getFullTaxonomy(sessionFor("u1", "TRAINEE"))).rejects.toThrow(ForbiddenError);
-    await expect(getFullTaxonomy(sessionFor("u1", "TRAINER_TRAINING_MANAGER"))).rejects.toThrow(ForbiddenError);
   });
 
   it("returns the full nested tree for ADMIN", async () => {

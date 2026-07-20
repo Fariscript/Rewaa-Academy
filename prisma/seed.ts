@@ -1,9 +1,10 @@
 import { prisma } from "../src/lib/prisma";
 
 // One fixture user per role (CLAUDE.md Roles table) for local dev + tests.
+// Two roles only for now — ADMIN covers what would be a separate Trainer/
+// Training Manager role too. See prisma/schema.prisma's Role enum comment.
 const FIXTURE_USERS = [
   { email: "trainee@example.com", name: "Trainee Fixture", role: "TRAINEE" as const },
-  { email: "trainer@example.com", name: "Trainer Fixture", role: "TRAINER_TRAINING_MANAGER" as const },
   { email: "admin@example.com", name: "Admin Fixture", role: "ADMIN" as const },
 ];
 

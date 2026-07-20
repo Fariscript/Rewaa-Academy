@@ -10,13 +10,15 @@ datasource db {
   provider = "postgresql"
 }
 
-// Roles table, CLAUDE.md:
-// Trainee                     — sector-scoped content + quizzes only
-// TRAINER_TRAINING_MANAGER    — approves question bank, grades manual submissions, views testing dashboard
-// ADMIN                       — manages taxonomy, assigns/reassigns trainees to sectors, can override attempts
+// Roles table, CLAUDE.md. Two roles only for now — ADMIN currently covers
+// what would be a separate Trainer/Training Manager role too (question-bank
+// approval, manual grading, dashboard), until/unless that splits out later.
+// Trainee — sector-scoped content + quizzes only
+// ADMIN   — manages taxonomy, assigns/reassigns trainees to sectors, can
+//           override attempts, approves question bank, grades manual
+//           submissions, views testing dashboard
 enum Role {
   TRAINEE
-  TRAINER_TRAINING_MANAGER
   ADMIN
 }
 

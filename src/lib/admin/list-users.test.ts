@@ -15,12 +15,9 @@ describe("listUsers (GET /api/admin/users)", () => {
     await expect(listUsers(null)).rejects.toThrow(UnauthenticatedError);
   });
 
-  it.each(["TRAINEE", "TRAINER_TRAINING_MANAGER"] as const)(
-    "rejects role=%s with ForbiddenError",
-    async (role) => {
-      await expect(listUsers(sessionFor(role))).rejects.toThrow(ForbiddenError);
-    },
-  );
+  it("rejects role=TRAINEE with ForbiddenError", async () => {
+    await expect(listUsers(sessionFor("TRAINEE"))).rejects.toThrow(ForbiddenError);
+  });
 
   it("allows ADMIN and returns at least the seeded fixture users", async () => {
     // Not an exact-set match: other test files create their own short-lived
@@ -28,8 +25,6 @@ describe("listUsers (GET /api/admin/users)", () => {
     // by default, so other users may legitimately exist at the same time.
     const users = await listUsers(sessionFor("ADMIN"));
     const emails = users.map((u) => u.email);
-    expect(emails).toEqual(
-      expect.arrayContaining(["admin@example.com", "trainee@example.com", "trainer@example.com"]),
-    );
+    expect(emails).toEqual(expect.arrayContaining(["admin@example.com", "trainee@example.com"]));
   });
 });

@@ -30,7 +30,7 @@ describe("assignTraineeSector (PATCH /api/admin/trainees/:id/sector)", () => {
     const trainee = await ensureTrainee("assign-sector-fixture@example.com");
     const services = await prisma.sector.findUniqueOrThrow({ where: { name: "الخدمات" } });
     await expect(
-      assignTraineeSector(sessionFor("caller", "TRAINER_TRAINING_MANAGER"), trainee.id, services.id),
+      assignTraineeSector(sessionFor("caller", "TRAINEE"), trainee.id, services.id),
     ).rejects.toThrow(ForbiddenError);
   });
 
