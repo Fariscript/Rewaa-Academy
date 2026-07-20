@@ -4,16 +4,8 @@ import { requireRole } from "@/lib/auth/rbac";
 import { AiProviderError, NotFoundError } from "@/lib/errors";
 import { recordAudit } from "@/lib/audit/log";
 import { anthropicDrafter, type AiQuestionDrafter, type DraftedQuestionCandidate } from "@/lib/ai/drafter";
-import type { Question, QuestionType } from "@/generated/prisma/client";
-
-const SUPPORTED_TYPES: QuestionType[] = ["MCQ", "TRUE_FALSE"];
-
-interface ValidCandidate {
-  type: QuestionType;
-  prompt: string;
-  options: { id: string; text: string }[];
-  correctOption: string;
-}
+import { validateQuestionContent } from "./validate-content";
+import type { Question } from "@/generated/prisma/client";
 
 interface RejectedCandidate {
   input: unknown;
@@ -23,51 +15,6 @@ interface RejectedCandidate {
 export interface DraftQuestionsResult {
   created: Question[];
   rejected: RejectedCandidate[];
-}
-
-// CLAUDE.md "Slice 5 decisions": validated before persisting, not after —
-// a malformed candidate is never written to the DB at all.
-function validateCandidate(candidate: DraftedQuestionCandidate): { ok: true; value: ValidCandidate } | { ok: false; reason: string } {
-  const { type, prompt, options, correctOption } = candidate;
-
-  if (typeof type !== "string" || !SUPPORTED_TYPES.includes(type as QuestionType)) {
-    return { ok: false, reason: `unsupported question type: ${String(type)}` };
-  }
-  if (typeof prompt !== "string" || prompt.trim().length === 0) {
-    return { ok: false, reason: "empty or missing prompt" };
-  }
-  if (!Array.isArray(options) || options.length === 0) {
-    return { ok: false, reason: "empty or missing options" };
-  }
-  for (const option of options) {
-    if (
-      typeof option !== "object" ||
-      option === null ||
-      typeof (option as Record<string, unknown>).id !== "string" ||
-      ((option as Record<string, unknown>).id as string).trim().length === 0 ||
-      typeof (option as Record<string, unknown>).text !== "string" ||
-      ((option as Record<string, unknown>).text as string).trim().length === 0
-    ) {
-      return { ok: false, reason: "an option is missing a non-empty id or text" };
-    }
-  }
-  if (typeof correctOption !== "string" || correctOption.trim().length === 0) {
-    return { ok: false, reason: "empty or missing correctOption" };
-  }
-  const optionIds = (options as { id: string; text: string }[]).map((o) => o.id);
-  if (!optionIds.includes(correctOption)) {
-    return { ok: false, reason: "correctOption does not match any option id" };
-  }
-
-  return {
-    ok: true,
-    value: {
-      type: type as QuestionType,
-      prompt: prompt.trim(),
-      options: options as { id: string; text: string }[],
-      correctOption,
-    },
-  };
 }
 
 // T-10/T-11/T-12/NFR-06: AI drafts candidates; every created row lands as
@@ -111,7 +58,7 @@ export async function draftQuestions(
   const rejected: RejectedCandidate[] = [];
 
   for (const candidate of candidates) {
-    const result = validateCandidate(candidate);
+    const result = validateQuestionContent(candidate);
     if (!result.ok) {
       rejected.push({ input: candidate, reason: result.reason });
       continue;
