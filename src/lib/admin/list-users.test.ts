@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Session } from "next-auth";
-import { ForbiddenError, UnauthenticatedError } from "@/lib/auth/rbac";
+import { ForbiddenError, UnauthenticatedError } from "@/lib/errors";
 import { listUsers } from "./list-users";
 
 function sessionFor(role: Session["user"]["role"]): Session {

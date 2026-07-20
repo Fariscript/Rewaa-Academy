@@ -30,13 +30,110 @@ model User {
   emailVerified DateTime?
   role          Role      @default(TRAINEE)
 
-  accounts Account[]
-  sessions Session[]
+  // FR-07: a trainee is assigned to a sector by an Admin. Null until assigned.
+  sectorId String?
+  sector   Sector? @relation(fields: [sectorId], references: [id])
+
+  accounts  Account[]
+  sessions  Session[]
+  auditLogs AuditLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("users")
+}
+
+// --- Sector-scoped content model (stub) -------------------------------
+// Ibrahim's content system owns real content authoring; this is just enough
+// structure for the testing engine to depend on (sector-scoped access,
+// lesson-complete tracking in slice 3, question tagging in slice 5).
+// Hierarchy follows NFR-10: Sector -> Sub-sector -> Skill Type (-> Unit).
+
+// FR-05: top-level sectors (Services, Retail, Restaurants & Cafés, ...).
+model Sector {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  subSectors SubSector[]
+  trainees   User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sectors")
+}
+
+// FR-06: sectors are broken into sub-sectors.
+model SubSector {
+  id       String @id @default(cuid())
+  name     String
+  sectorId String
+  sector   Sector @relation(fields: [sectorId], references: [id], onDelete: Cascade)
+  units    Unit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sectorId, name])
+  @@map("sub_sectors")
+}
+
+// FR-08: two fixed categories per sector, Soft Skills and Hard Skills.
+enum SkillType {
+  SOFT
+  HARD
+}
+
+// FR-09/FR-10/T-14: a named topic/subcategory under a skill type (e.g. "أول
+// مكالمة" under Soft Skills). This is the tagging granularity the question
+// bank (slice 5) and quiz assembly (slice 4, T-16) key off — sector and
+// skill type are both reachable from a Unit via subSector.sector + skillType.
+model Unit {
+  id          String    @id @default(cuid())
+  name        String
+  skillType   SkillType
+  subSectorId String
+  subSector   SubSector @relation(fields: [subSectorId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([subSectorId, name])
+  @@map("units")
+}
+
+// FR-12 stub: the real content item (video/PDF/article) lives in Ibrahim's
+// content system — this row is just enough for lesson-complete tracking
+// (slice 3) to key off.
+model Lesson {
+  id     String @id @default(cuid())
+  title  String
+  unitId String
+  unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("lessons")
+}
+
+// NFR-05: audit trail of Admin actions (user creation, sector/role
+// assignment, content changes...). Introduced here for the first real admin
+// mutation (sector reassignment); slice 4's attempt overrides and slice 5's
+// question approvals reuse this.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actor      User     @relation(fields: [actorId], references: [id])
+  action     String
+  targetType String
+  targetId   String
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
 }
 
 // Standard Auth.js (NextAuth v5) Prisma adapter models below.
