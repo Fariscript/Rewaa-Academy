@@ -57,7 +57,7 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | T-29 | Practical/video test: trainee performs steps in-platform, AI grades th | Phase 2 | Not started | | |
 | T-30 | Voice-simulation test: AI plays a customer/lead, scores the trainee's  | Phase 2 | Not started | | |
 | T-31 | Voice quiz: AI agent asks the trainee a question aloud; trainee replie | Phase 2 | Not started | | |
-| T-32 | Pop quiz includes a visible countdown timer per attempt; quiz auto-sub | Phase 1 | Partial (server-side timeLimit + lazy auto-submit-on-access done; visible countdown UI not built — no trainee-facing quiz UI exists yet) | prisma/schema.prisma (Quiz.timeLimitSeconds), src/lib/quiz/attempt-lifecycle.ts | src/lib/quiz/start-attempt.test.ts, src/lib/quiz/attempt-flow.test.ts |
+| T-32 | Pop quiz includes a visible countdown timer per attempt; quiz auto-sub | Phase 1 | Partial (server-side timeLimit + lazy auto-submit-on-access done; slice 9 added the trainee attempt read view — GET /api/attempts/[id] with expiresAt/serverNow for the countdown and answer-key redaction; visible countdown UI itself is slice 12) | prisma/schema.prisma (Quiz.timeLimitSeconds), src/lib/quiz/attempt-lifecycle.ts, src/lib/quiz/attempt-view.ts, src/app/api/attempts/[id]/route.ts | src/lib/quiz/start-attempt.test.ts, src/lib/quiz/attempt-flow.test.ts, src/lib/quiz/attempt-view.test.ts |
 | T-33 | Quiz does not auto-launch when a lesson is marked complete | Phase 1 | Done (unlock check is read-only; nothing creates an attempt — the Start-button/attempt flow itself is slice 4) | src/lib/content/quiz-unlock.ts, src/lib/content/lesson-completion.ts | src/lib/content/quiz-unlock.test.ts |
 | T-34 | AI Voice Call Training: AI agent conducts a simulated sales call with  | Phase 2 | Not started | | |
 | T-35 | AI Video Grader: trainee uploads a video (e.g. recorded mock call or p | Phase 2 | Not started | | |
@@ -74,7 +74,7 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | NFR-10 | Consistent, intuitive navigation across Sector → Sub-sector → Skill Ty | - | Partial (schema follows this hierarchy; no navigation UI built yet) | prisma/schema.prisma | src/lib/content/taxonomy.test.ts |
 | NFR-11 | Responsive layout usable on both desktop and mobile browsers | - | Not started | | |
 | NFR-12 | Test-taking flow requires zero manual explanation to the trainee | - | Not started | | |
-| NFR-13 | Editing a question does not retroactively change scores of completed a | - | Not started | | |
+| NFR-13 | Editing a question does not retroactively change scores of completed a | - | Done (guaranteed by design since slice 4 — AttemptAnswer snapshots question content at attempt-start and scoring only ever reads the snapshot; slice 9 added the named regression test) | prisma/schema.prisma (AttemptAnswer), src/lib/quiz/start-attempt.ts | src/lib/quiz/nfr13-question-edit-isolation.test.ts |
 | NFR-14 | High uptime targeted during business hours | - | Not started | | |
 | NFR-15 | Regular backups of user data, content, test results, question bank, an | - | Not started | | |
 | NFR-16 | Architecture supports adding sectors, sub-sectors, and content volume  | - | Partial (schema imposes no fixed limits; no load testing done) | prisma/schema.prisma | |
