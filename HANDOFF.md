@@ -1,6 +1,56 @@
 # Handoff — Rewaa Sales Academy (Testing & Assessment Engine)
 
-Last updated: 2026-07-20, after commit `13b9920`.
+Last updated: 2026-07-20 (second update, after the slice 9–15 UI/completion
+run; the original snapshot below it is kept as-is where still accurate).
+
+## Update 2026-07-20: slices 9–15 — the UI/API completion run
+
+The original snapshot below said "Phase 1 essentially complete"; that was
+true of the lib/API layer only — the product had no UI beyond login and a
+placeholder home. A second build run closed that:
+
+- **Slice 9** — trainee attempt read view (`GET /api/attempts/[id]`,
+  ownership-checked before `syncExpiry`, answer key redacted
+  unconditionally) + the NFR-13 named regression test. Also **fixed a live
+  answer-key leak**: the PATCH-answers and POST-submit responses used to
+  serialize raw `AttemptAnswer` rows including `correctOption` — mid-attempt
+  in the PATCH case. All trainee-facing attempt reads now pass through
+  `toTraineeAttemptView` (`src/lib/quiz/attempt-view.ts`).
+- **Slice 10** — admin quiz catalog (`GET /api/admin/quizzes`) + the
+  roles-table "Admin can override attempts" capability:
+  `AttemptCapOverride` grants (+1 each, reason required, audited), default
+  cap of 2 immutable, honored by start-attempt/outcome/dashboard.
+  Deliberately does not decide open item #1.
+- **CI** — `.github/workflows/ci.yml`: postgres:16 service container,
+  lint + tsc + the full Vitest suite (migrated + seeded) + `next build`.
+- **Slices 11–13** — full trainee UI (Arabic RTL, mobile-first, plain
+  Tailwind, first client components): home sector tree, lesson page with
+  the literal Start button (T-33), quiz runner with the visible
+  server-authoritative countdown/autosave/resume (T-32 now Done), result
+  page, certificate page (lazy issuance on visit). Also **fixed a real
+  certificate-PDF bug**: Latin SSO names and Western date digits rendered
+  as tofu boxes (drawn with the Arabic-only font) — now split into script
+  runs per font, verified pixel-level.
+- **Slices 14–15** — admin UI: shell + role redirects, quiz index,
+  per-quiz dashboard (tiles + trainee table + grant-attempt control),
+  trainees/sector assignment, grading queue with an isolated binary
+  grade-input (so a partial-credit answer to open item #4 changes one
+  component + `gradeAnswer`).
+- **Owner decisions recorded 2026-07-20:** FR-18 taxonomy CUD and T-36
+  content-level versioning are **deferred to Ibrahim's content system**;
+  this engine keeps its read-only taxonomy mirror.
+- **Still exactly as blocked as before:** slice 5b live verification
+  (needs `ANTHROPIC_API_KEY`), T-26 finalization (open item #4), and the
+  question-bank UI (held behind 5b per the no-stacking rule). Phase 2
+  remains embargoed until 5b + T-26 close. **Open item #3b is now a launch
+  gate:** the trainee UI exists, so confirm sequential-ordering with the
+  CEO before real trainees get access.
+- Remember to tell Ibrahim's content team about open item #7 (95% is only
+  reachable at question counts where it lands on a whole number).
+
+Everything below is the original snapshot.
+
+---
 
 This file is a snapshot for coworkers (and their AI agents) picking up this
 repo. It does not replace the two living source-of-truth docs — read those

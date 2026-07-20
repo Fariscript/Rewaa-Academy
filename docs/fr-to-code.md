@@ -20,7 +20,7 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | FR-12 | Admin uploads/manages content items per subcategory (video, PDF, artic | - | Stub (Lesson row is a title-only placeholder; real content authoring is Ibrahim's system) | prisma/schema.prisma | src/lib/content/taxonomy.test.ts |
 | FR-13 | Search/browse content within assigned sector only | - | Done (browse, server-side scoped; slice 11 added the browse UI — home tree + lesson page, foreign-sector lessons 404. No search yet — not needed until real content exists) | src/lib/content/taxonomy.ts, src/lib/content/trainee-progress.ts, src/app/api/content/route.ts, src/app/(trainee)/page.tsx, src/app/(trainee)/lessons/[id]/page.tsx | src/lib/content/taxonomy.test.ts, src/lib/content/trainee-progress.test.ts |
 | FR-14 | Reassign an employee's sector on role/department change | - | Done — touches open item #2 (quiz-progress-on-reassignment), left as a TODO since no attempt model exists yet | src/lib/admin/assign-sector.ts | src/lib/admin/assign-sector.test.ts |
-| FR-18 | Flexible admin panel to add/edit sectors, sub-sectors, and paths witho | - | Partial (Admin read of full taxonomy only; no create/edit/delete yet) | src/lib/content/taxonomy.ts, src/app/api/admin/sectors/route.ts | src/lib/content/taxonomy.test.ts |
+| FR-18 | Flexible admin panel to add/edit sectors, sub-sectors, and paths witho | - | Deferred to the content system (Ibrahim's track) — owner decision 2026-07-20: the authoritative taxonomy lives there; this engine keeps its read-only mirror (GET /api/admin/sectors) and will not grow taxonomy CUD | src/lib/content/taxonomy.ts, src/app/api/admin/sectors/route.ts | src/lib/content/taxonomy.test.ts |
 | FR-21 | Progress bars, today's lesson/task, trainee lists & status, enrollment | - | Not started | | |
 | FR-22 | Weekly video/PDF/slide upload | - | Not started | | |
 | FR-25 | Daily reminders, pre-session alerts, “behind” alerts, trainer alerts | - | Not started | | |
@@ -61,7 +61,7 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | T-33 | Quiz does not auto-launch when a lesson is marked complete | Phase 1 | Done (unlock check is read-only; nothing creates an attempt — slice 11 added the literal Start button UI: the attempt/timer begin only on tap) | src/lib/content/quiz-unlock.ts, src/lib/content/lesson-completion.ts, src/components/quiz/start-quiz-button.tsx | src/lib/content/quiz-unlock.test.ts |
 | T-34 | AI Voice Call Training: AI agent conducts a simulated sales call with  | Phase 2 | Not started | | |
 | T-35 | AI Video Grader: trainee uploads a video (e.g. recorded mock call or p | Phase 2 | Not started | | |
-| T-36 | Question bank versioning (see #15) is mirrored at the content level: c | Phase 1 | Not started | | |
+| T-36 | Question bank versioning (see #15) is mirrored at the content level: c | Phase 1 | Deferred to the content system (Ibrahim's track) — owner decision 2026-07-20: Lesson here is a title-only stub; versioning real content belongs to the system that owns the content models | | |
 | NFR-01 | OAuth 2.0 via Google Workspace SSO | - | Done | src/auth.ts | src/lib/auth/domain.test.ts |
 | NFR-02 | Sector-based and role-based access control enforced server-side, not j | - | Done | src/lib/auth/rbac.ts, src/proxy.ts, src/lib/content/taxonomy.ts | src/lib/auth/rbac.test.ts, src/lib/content/taxonomy.test.ts |
 | NFR-03 | HTTPS/TLS everywhere | - | Not started (deployment concern) | | |
@@ -78,6 +78,6 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | NFR-14 | High uptime targeted during business hours | - | Not started | | |
 | NFR-15 | Regular backups of user data, content, test results, question bank, an | - | Not started | | |
 | NFR-16 | Architecture supports adding sectors, sub-sectors, and content volume  | - | Partial (schema imposes no fixed limits; no load testing done) | prisma/schema.prisma | |
-| NFR-17 | Admins manage the full taxonomy (sectors, sub-sectors, paths) and Trai | - | Partial (Admin read-only taxonomy access; create/edit is FR-18's remaining gap) | src/lib/content/taxonomy.ts | src/lib/content/taxonomy.test.ts |
+| NFR-17 | Admins manage the full taxonomy (sectors, sub-sectors, paths) and Trai | - | Partial (taxonomy management deferred to the content system with FR-18 — owner decision 2026-07-20; the Trainer/consumption side of this NFR is served by the read-only taxonomy + trainee UI) | src/lib/content/taxonomy.ts | src/lib/content/taxonomy.test.ts |
 | NFR-18 | Verifiable digital signature on certificates | - | Done (Ed25519, public verify endpoint) | src/lib/certificates/signing.ts, src/lib/certificates/verify.ts | src/lib/certificates/signing.test.ts, src/lib/certificates/verify.test.ts |
 | NFR-19 | Google Workspace SSO | - | Done | src/auth.ts | src/lib/auth/domain.test.ts |
