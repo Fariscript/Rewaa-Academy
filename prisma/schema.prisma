@@ -1,0 +1,84 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Roles table, CLAUDE.md:
+// Trainee                     — sector-scoped content + quizzes only
+// TRAINER_TRAINING_MANAGER    — approves question bank, grades manual submissions, views testing dashboard
+// ADMIN                       — manages taxonomy, assigns/reassigns trainees to sectors, can override attempts
+enum Role {
+  TRAINEE
+  TRAINER_TRAINING_MANAGER
+  ADMIN
+}
+
+// FR-02, FR-03, T-27: identity comes from Google Workspace SSO only, restricted
+// to the company domain — there is no separate password auth for this platform.
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  emailVerified DateTime?
+  role          Role      @default(TRAINEE)
+
+  accounts Account[]
+  sessions Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// Standard Auth.js (NextAuth v5) Prisma adapter models below.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+// Database session strategy (not JWT): lets us look up, and forcibly expire,
+// a trainee's session server-side — required for NFR-04 (session timeout /
+// re-authentication after prolonged inactivity).
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
