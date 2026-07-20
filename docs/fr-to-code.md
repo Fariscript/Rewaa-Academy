@@ -36,8 +36,8 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | T-8 | Quiz surfaces to the trainee without requiring manual notification fro | Phase 1 | Done (unlock state is computed on read — nothing to manually surface) | src/lib/content/quiz-unlock.ts | src/lib/content/quiz-unlock.test.ts |
 | T-9 | Trainee can start a quiz only when prior required content/quizzes are  | Phase 1 | Partial — touches open item #3b (does this mean sequential ordering across a sector, not just this one lesson? pending CEO confirmation) | src/lib/content/quiz-unlock.ts | src/lib/content/quiz-unlock.test.ts |
 | T-10 | AI drafts candidate questions per lesson/topic | Phase 1 | Done — held pending manual live-provider verification before considered fully closed | src/lib/ai/drafter.ts, src/lib/questions/draft.ts | src/lib/questions/draft.test.ts |
-| T-11 | Every AI-drafted question requires human review | Phase 1 | Not started | | |
-| T-12 | Only approved questions are eligible to be served in a live quiz | Phase 1 | Not started | | |
+| T-11 | Every AI-drafted question requires human review | Phase 1 | Done | src/lib/questions/approve.ts | src/lib/questions/approve.test.ts |
+| T-12 | Only approved questions are eligible to be served in a live quiz | Phase 1 | Partial (approve/reject gate exists; quiz-assembly filtering to APPROVED-only is 5e) | src/lib/questions/approve.ts | src/lib/questions/approve.test.ts |
 | T-13 | Trainer/Training Manager can manually add, edit, or retire questions | Phase 1 | Not started | | |
 | T-14 | Questions tagged by sector, skill type, unit, and question type | Phase 1 | Done (derived via quiz.lesson.unit, not duplicated on Question) | prisma/schema.prisma | src/lib/questions/schema.smoke.test.ts |
 | T-15 | Question bank supports versioning without altering historical results | Phase 1 | Partial (QuestionRevision table + relations exist; the edit/restore workflow that writes to it is slice 5d) | prisma/schema.prisma | src/lib/questions/schema.smoke.test.ts |
