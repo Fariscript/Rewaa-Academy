@@ -5,7 +5,10 @@ import { syncExpiry } from "./attempt-lifecycle";
 
 export interface AnswerInput {
   questionId: string;
-  selectedOption: string | null;
+  // MCQ/TRUE_FALSE:
+  selectedOption?: string | null;
+  // SCENARIO/FREE_TEXT/MOCK_CALL (T-18):
+  textAnswer?: string | null;
 }
 
 // T-32: incremental saves are what makes "auto-submits the trainee's
@@ -24,12 +27,15 @@ export async function saveAnswers(session: Session | null, attemptId: string, an
   }
 
   await Promise.all(
-    answers.map((a) =>
-      prisma.attemptAnswer.updateMany({
+    answers.map((a) => {
+      const data: { selectedOption?: string | null; textAnswer?: string | null } = {};
+      if ("selectedOption" in a) data.selectedOption = a.selectedOption;
+      if ("textAnswer" in a) data.textAnswer = a.textAnswer;
+      return prisma.attemptAnswer.updateMany({
         where: { attemptId, questionId: a.questionId },
-        data: { selectedOption: a.selectedOption },
-      }),
-    ),
+        data,
+      });
+    }),
   );
 
   return prisma.attempt.findUniqueOrThrow({ where: { id: attemptId }, include: { answers: true } });

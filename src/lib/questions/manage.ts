@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/auth/rbac";
 import { ForbiddenError, NotFoundError } from "@/lib/errors";
 import { recordAudit } from "@/lib/audit/log";
 import { validateQuestionContent, type QuestionContentInput } from "./validate-content";
+import { Prisma } from "@/generated/prisma/client";
 
 // T-13: manually-authored questions start DRAFT too — no bypass for manual
 // authorship by an Admin (CLAUDE.md "Slice 5 decisions"), same as AI-drafted.
@@ -21,7 +22,7 @@ export async function createQuestion(session: Session | null, quizId: string, in
       quizId,
       type: result.value.type,
       prompt: result.value.prompt,
-      options: result.value.options,
+      options: result.value.options ?? undefined,
       correctOption: result.value.correctOption,
       source: "MANUAL",
       status: "DRAFT",
@@ -53,7 +54,7 @@ export async function editQuestion(session: Session | null, questionId: string, 
         questionId,
         type: question.type,
         prompt: question.prompt,
-        options: question.options as object,
+        options: question.options === null ? Prisma.DbNull : (question.options as object),
         correctOption: question.correctOption,
         status: question.status,
         editedById: session.user.id,
@@ -65,7 +66,11 @@ export async function editQuestion(session: Session | null, questionId: string, 
       data: {
         type: result.value.type,
         prompt: result.value.prompt,
-        options: result.value.options,
+        // Prisma.DbNull, not undefined: this is an update, and undefined
+        // means "leave the existing value alone" — if an edit changes an
+        // MCQ into a FREE_TEXT, the old options must actually be cleared,
+        // not left stale on a question that no longer uses them.
+        options: result.value.options === null ? Prisma.DbNull : result.value.options,
         correctOption: result.value.correctOption,
         status: "DRAFT",
         approvedById: null,

@@ -44,6 +44,7 @@ model User {
   createdQuestions  Question[]         @relation("QuestionCreatedBy")
   approvedQuestions Question[]         @relation("QuestionApprovedBy")
   questionRevisions QuestionRevision[]
+  gradedAnswers     AttemptAnswer[]    @relation("AttemptAnswerGradedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -162,13 +163,18 @@ model Quiz {
   @@map("quizzes")
 }
 
-// T-17: only the auto-gradable types are modeled here. Scenario/free-text/
-// mock-call (T-18, manually graded) are slice 6's concern. Question is
+// T-17: MCQ/TRUE_FALSE are auto-graded. T-18: SCENARIO/FREE_TEXT/MOCK_CALL
+// have no fixed correct answer and are routed to manual grading instead —
+// see src/lib/questions/question-types.ts for the auto-graded/manual split
+// used throughout scoring, validation, and the grading queue. Question is
 // quiz-owned; T-14's sector/skill-type/unit tags stay derivable via
 // quiz.lesson.unit rather than being duplicated here.
 enum QuestionType {
   MCQ
   TRUE_FALSE
+  SCENARIO
+  FREE_TEXT
+  MOCK_CALL
 }
 
 // T-10/T-11/T-12/NFR-06: every question starts DRAFT regardless of origin —
@@ -197,8 +203,9 @@ model Question {
   prompt String
 
   // MCQ: [{id, text}, ...]. TRUE_FALSE: [{id:"true",text:"..."},{id:"false",text:"..."}].
-  options       Json
-  correctOption String
+  // Null for SCENARIO/FREE_TEXT/MOCK_CALL — no fixed options or answer key.
+  options       Json?
+  correctOption String?
 
   status QuestionStatus @default(DRAFT)
   source QuestionSource @default(MANUAL)
@@ -230,8 +237,8 @@ model QuestionRevision {
 
   type          QuestionType
   prompt        String
-  options       Json
-  correctOption String
+  options       Json?
+  correctOption String?
   status        QuestionStatus
 
   editedById String?
@@ -242,10 +249,18 @@ model QuestionRevision {
   @@map("question_revisions")
 }
 
+// PENDING_MANUAL_GRADE: T-18 — an attempt containing at least one
+// SCENARIO/FREE_TEXT/MOCK_CALL answer is routed here on submit instead of
+// being scored immediately. There is deliberately no path from this status
+// to SUBMITTED/AUTO_SUBMITTED yet: converting graded items into an overall
+// score/passed (T-26) depends on CLAUDE.md open item #4 (does manual
+// grading hit the same 95% bar, or is it Admin judgment?), which is
+// unresolved. See src/lib/grading/.
 enum AttemptStatus {
   IN_PROGRESS
   SUBMITTED
   AUTO_SUBMITTED
+  PENDING_MANUAL_GRADE
 }
 
 // T-19: trainee id, quiz id, timestamp, answers, score, outcome all live
@@ -289,11 +304,25 @@ model AttemptAnswer {
 
   questionPrompt String
   questionType   QuestionType
-  options        Json
-  correctOption  String
+  options        Json?
+  correctOption  String?
 
+  // MCQ/TRUE_FALSE:
   selectedOption String?
-  isCorrect      Boolean?
+  // SCENARIO/FREE_TEXT/MOCK_CALL — T-18: the trainee's written response.
+  textAnswer     String?
+
+  // Auto-graded (MCQ/TRUE_FALSE): set immediately at finalize time.
+  // Manually-graded: null until an Admin grades it (T-25) — see
+  // src/lib/grading/. Reused as the per-item correctness judgment either
+  // way, but nothing yet converts a manual grade into the attempt's
+  // overall score/passed (T-26, open item #4).
+  isCorrect Boolean?
+  feedback  String?
+
+  gradedById String?
+  gradedBy   User?     @relation("AttemptAnswerGradedBy", fields: [gradedById], references: [id])
+  gradedAt   DateTime?
 
   @@unique([attemptId, questionId])
   @@map("attempt_answers")

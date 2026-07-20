@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { scoreAnswers } from "./scoring";
+import { isAutoGraded } from "@/lib/questions/question-types";
 
 // TODO(ownership-audit-1): this function trusts attemptId unconditionally —
 // it has no session/ownership check of its own. Every current call site
@@ -14,6 +15,15 @@ import { scoreAnswers } from "./scoring";
 // Finalizes an attempt (SUBMITTED via explicit submit, or AUTO_SUBMITTED via
 // syncExpiry below) by scoring whatever answers were saved. Idempotent: an
 // already-finalized attempt's row is left untouched rather than re-scored.
+//
+// T-18: an attempt containing any SCENARIO/FREE_TEXT/MOCK_CALL answer is
+// routed to PENDING_MANUAL_GRADE instead — score/passed stay null. This is
+// a hard stop, not a placeholder: CLAUDE.md open item #4 (does manual
+// grading need to hit the same 95% bar, or is it Admin judgment?) is
+// unresolved, so there is no rule anywhere in this codebase for combining
+// manual grades into an overall score. See src/lib/grading/ for what *is*
+// built (routing + per-item grade capture) and what deliberately isn't
+// (finalization).
 export async function finalizeAttempt(attemptId: string, status: "SUBMITTED" | "AUTO_SUBMITTED") {
   return prisma.$transaction(async (tx) => {
     const attempt = await tx.attempt.findUniqueOrThrow({
@@ -22,10 +32,14 @@ export async function finalizeAttempt(attemptId: string, status: "SUBMITTED" | "
     });
     if (attempt.status !== "IN_PROGRESS") return attempt;
 
-    const result = scoreAnswers(attempt.answers);
+    const autoGraded = attempt.answers.filter((a) => isAutoGraded(a.questionType));
+    const needsManualGrading = autoGraded.length < attempt.answers.length;
 
+    // Auto-graded answers get their correctness computed immediately
+    // regardless of whether other answers in the same attempt need manual
+    // grading — that judgment doesn't depend on open item #4.
     await Promise.all(
-      attempt.answers.map((answer) =>
+      autoGraded.map((answer) =>
         tx.attemptAnswer.update({
           where: { id: answer.id },
           data: { isCorrect: answer.selectedOption !== null && answer.selectedOption === answer.correctOption },
@@ -33,6 +47,15 @@ export async function finalizeAttempt(attemptId: string, status: "SUBMITTED" | "
       ),
     );
 
+    if (needsManualGrading) {
+      return tx.attempt.update({
+        where: { id: attemptId },
+        data: { status: "PENDING_MANUAL_GRADE", submittedAt: new Date() },
+        include: { answers: true },
+      });
+    }
+
+    const result = scoreAnswers(autoGraded);
     return tx.attempt.update({
       where: { id: attemptId },
       data: { status, submittedAt: new Date(), score: result.score, passed: result.passed },

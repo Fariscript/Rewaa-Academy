@@ -89,7 +89,13 @@ roleplay (T-30), deeper dashboard analytics (T-24).
     order-enforcement after trainees already have unordered access is
     expensive to unwind.
 4. Does manual grading need to hit the same 95% bar, or is it the grading
-   Admin's judgment?
+   Admin's judgment? Slice 6 hit this directly: routing to a grading queue
+   (T-18) and per-item grade + feedback capture (T-25) are built and
+   tested, but nothing converts a fully-graded attempt into an overall
+   score/passed (T-26) — an attempt with a manually-graded answer stays
+   PENDING_MANUAL_GRADE indefinitely. TODO(open-item-4) at
+   src/lib/grading/grading.ts and src/lib/quiz/attempt-lifecycle.ts marks
+   exactly where the finalization rule plugs in once this is answered.
 5. Notification rules (triggers, channels, wording) — not yet defined.
 6. FR-26 (Call Library & Evaluation) — flagged for a change in the latest
    meeting, but no detail was captured yet.

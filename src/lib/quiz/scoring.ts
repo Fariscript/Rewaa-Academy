@@ -10,7 +10,11 @@ export function isPassing(correctCount: number, totalCount: number): boolean {
 
 export interface ScorableAnswer {
   selectedOption: string | null;
-  correctOption: string;
+  // Nullable because AttemptAnswer.correctOption is null for
+  // manually-graded question types — the equality check below already
+  // treats that as never-matching, so this is just a type widening to
+  // match reality, not a behavior change for auto-graded answers.
+  correctOption: string | null;
 }
 
 export interface ScoreResult {

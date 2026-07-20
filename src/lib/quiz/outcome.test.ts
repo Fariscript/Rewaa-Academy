@@ -3,6 +3,8 @@ import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { markLessonComplete } from "@/lib/content/lesson-completion";
 import { isQuizUnlocked } from "@/lib/content/quiz-unlock";
+import { createQuestion } from "@/lib/questions/manage";
+import { approveQuestion } from "@/lib/questions/approve";
 import { startAttempt } from "./start-attempt";
 import { saveAnswers } from "./save-answers";
 import { submitAttempt } from "./submit-attempt";
@@ -121,5 +123,51 @@ describe("getQuizOutcome: FAILED_FINAL_ATTEMPT is informational only (open item 
     // failing both attempts on one quiz has no cross-quiz side effect.
     await markLessonComplete(session, untouchedLesson.id);
     expect(await isQuizUnlocked(session, untouchedQuiz.id)).toBe(true);
+  });
+});
+
+describe("getQuizOutcome: AWAITING_MANUAL_GRADE (T-18) doesn't preempt pass/fail", () => {
+  let trainee: { id: string };
+  let admin: { id: string };
+  let lesson: { id: string };
+  let quiz: { id: string };
+  let session: Session;
+
+  beforeAll(async () => {
+    trainee = await prisma.user.findUniqueOrThrow({ where: { email: "trainee@example.com" } });
+    admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@example.com" } });
+    session = sessionFor(trainee.id, "TRAINEE");
+    const adminSession = sessionFor(admin.id, "ADMIN");
+
+    const fixture = await createEphemeralQuiz("سؤال 6: نتيجة بانتظار التصحيح", 600);
+    lesson = fixture.lesson;
+    quiz = fixture.quiz;
+    await markLessonComplete(session, lesson.id);
+
+    const freeText = await createQuestion(adminSession, quiz.id, {
+      type: "FREE_TEXT",
+      prompt: "اكتب إجابة حرة.",
+    });
+    await approveQuestion(adminSession, freeText.id);
+  });
+
+  afterAll(async () => {
+    await deleteEphemeralQuiz(lesson.id);
+  });
+
+  it("reports AWAITING_MANUAL_GRADE, not FAILED_FINAL_ATTEMPT, once submitted with an ungraded answer", async () => {
+    const attempt = await startAttempt(session, quiz.id);
+    const answers = await prisma.attemptAnswer.findMany({ where: { attemptId: attempt.id } });
+    const freeTextAnswer = answers.find((a) => a.questionType === "FREE_TEXT")!;
+    await saveAnswers(session, attempt.id, [
+      { questionId: freeTextAnswer.questionId!, textAnswer: "إجابة الطالب." },
+    ]);
+    await submitAttempt(session, attempt.id);
+
+    const outcome = await getQuizOutcome(session, quiz.id);
+    expect(outcome.status).toBe("AWAITING_MANUAL_GRADE");
+    expect(outcome.attemptsUsed).toBe(1); // still consumes an attempt slot
+    expect(outcome.bestScore).toBeNull(); // excluded from scoring while ungraded
+    expect(outcome.passed).toBe(false);
   });
 });

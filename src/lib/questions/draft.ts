@@ -5,6 +5,7 @@ import { AiProviderError, NotFoundError } from "@/lib/errors";
 import { recordAudit } from "@/lib/audit/log";
 import { anthropicDrafter, type AiQuestionDrafter, type DraftedQuestionCandidate } from "@/lib/ai/drafter";
 import { validateQuestionContent } from "./validate-content";
+import { isAutoGraded } from "./question-types";
 import type { Question } from "@/generated/prisma/client";
 
 interface RejectedCandidate {
@@ -63,12 +64,20 @@ export async function draftQuestions(
       rejected.push({ input: candidate, reason: result.reason });
       continue;
     }
+    // AI drafting stays scoped to auto-graded types (T-10's prompt only
+    // ever asks for MCQ/TRUE_FALSE) — validateQuestionContent now accepts
+    // all 5 types since slice 6, so this is a deliberate extra guard, not
+    // implied by validation alone.
+    if (!isAutoGraded(result.value.type)) {
+      rejected.push({ input: candidate, reason: `AI drafting does not support type ${result.value.type} yet` });
+      continue;
+    }
     const question = await prisma.question.create({
       data: {
         quizId,
         type: result.value.type,
         prompt: result.value.prompt,
-        options: result.value.options,
+        options: result.value.options ?? undefined,
         correctOption: result.value.correctOption,
         source: "AI_DRAFT",
         status: "DRAFT",

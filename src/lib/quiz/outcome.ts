@@ -3,7 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { ForbiddenError, NotFoundError, UnauthenticatedError } from "@/lib/errors";
 import { syncExpiry } from "./attempt-lifecycle";
 
-export type QuizOutcomeStatus = "NOT_STARTED" | "IN_PROGRESS" | "PASSED" | "FAILED_FINAL_ATTEMPT";
+export type QuizOutcomeStatus =
+  | "NOT_STARTED"
+  | "IN_PROGRESS"
+  | "AWAITING_MANUAL_GRADE"
+  | "PASSED"
+  | "FAILED_FINAL_ATTEMPT";
 
 export interface QuizOutcome {
   attemptsUsed: number;
@@ -13,7 +18,11 @@ export interface QuizOutcome {
 }
 
 // T-20: "highest score is the trainee's final result" — passed/bestScore
-// are computed across ALL finalized attempts, not just the most recent one.
+// are computed across ALL finalized (SUBMITTED/AUTO_SUBMITTED) attempts,
+// not just the most recent one. PENDING_MANUAL_GRADE attempts (T-18) still
+// consume an attempt slot but are deliberately excluded from the
+// score/passed computation — they have no score yet, and CLAUDE.md open
+// item #4 means there's no rule for what one would even mean here.
 export async function getQuizOutcome(session: Session | null, quizId: string): Promise<QuizOutcome> {
   if (!session?.user) throw new UnauthenticatedError();
 
@@ -34,15 +43,22 @@ export async function getQuizOutcome(session: Session | null, quizId: string): P
   const attempts = await prisma.attempt.findMany({ where: { userId: session.user.id, quizId } });
   const synced = await Promise.all(attempts.map((a) => syncExpiry(a.id)));
 
-  const finalized = synced.filter((a) => a.status !== "IN_PROGRESS");
+  const graded = synced.filter((a) => a.status === "SUBMITTED" || a.status === "AUTO_SUBMITTED");
+  const hasPendingGrade = synced.some((a) => a.status === "PENDING_MANUAL_GRADE");
   const hasInProgress = synced.some((a) => a.status === "IN_PROGRESS");
-  const bestScore = finalized.length > 0 ? Math.max(...finalized.map((a) => a.score ?? 0)) : null;
-  const passed = finalized.some((a) => a.passed === true);
+  const attemptsUsed = synced.filter((a) => a.status !== "IN_PROGRESS").length;
+
+  const bestScore = graded.length > 0 ? Math.max(...graded.map((a) => a.score ?? 0)) : null;
+  const passed = graded.some((a) => a.passed === true);
 
   let status: QuizOutcomeStatus;
   if (passed) {
     status = "PASSED";
-  } else if (finalized.length >= 2) {
+  } else if (hasPendingGrade) {
+    // Not yet known whether this will end up passed or failed — don't
+    // preempt that with FAILED_FINAL_ATTEMPT while grading is outstanding.
+    status = "AWAITING_MANUAL_GRADE";
+  } else if (attemptsUsed >= 2) {
     // TODO(open-item-1): what happens after both attempts fail — blocked,
     // flagged for manual review, or something else — is still unresolved.
     // This status is purely informational today: it feeds T-23's dashboard
@@ -53,11 +69,11 @@ export async function getQuizOutcome(session: Session | null, quizId: string): P
     // src/lib/content/quiz-unlock.ts, a dashboard action, or a
     // notification trigger for open item #5) — not here.
     status = "FAILED_FINAL_ATTEMPT";
-  } else if (hasInProgress || finalized.length >= 1) {
+  } else if (hasInProgress || attemptsUsed >= 1) {
     status = "IN_PROGRESS";
   } else {
     status = "NOT_STARTED";
   }
 
-  return { attemptsUsed: finalized.length, bestScore, passed, status };
+  return { attemptsUsed, bestScore, passed, status };
 }

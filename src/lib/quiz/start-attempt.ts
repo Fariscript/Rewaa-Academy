@@ -58,7 +58,7 @@ export async function startAttempt(session: Session | null, quizId: string) {
         questionId: q.id,
         questionPrompt: q.prompt,
         questionType: q.type,
-        options: q.options as object,
+        options: q.options === null ? undefined : (q.options as object),
         correctOption: q.correctOption,
       })),
     });

@@ -3,6 +3,8 @@ import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError } from "@/lib/errors";
 import { markLessonComplete } from "@/lib/content/lesson-completion";
+import { createQuestion } from "@/lib/questions/manage";
+import { approveQuestion } from "@/lib/questions/approve";
 import { startAttempt } from "./start-attempt";
 import { saveAnswers } from "./save-answers";
 import { submitAttempt } from "./submit-attempt";
@@ -109,5 +111,60 @@ describe("expiry mid-attempt: auto-submits whatever was saved", () => {
     expect(finalized.status).toBe("AUTO_SUBMITTED");
     expect(finalized.score).toBe(50); // 1 of 2 answered correctly, 1 left blank
     expect(finalized.passed).toBe(false);
+  });
+});
+
+describe("submitting a manually-graded question routes to PENDING_MANUAL_GRADE (T-18)", () => {
+  let trainee: { id: string };
+  let admin: { id: string };
+  let lesson: { id: string };
+  let quiz: { id: string };
+  let session: Session;
+
+  beforeAll(async () => {
+    trainee = await prisma.user.findUniqueOrThrow({ where: { email: "trainee@example.com" } });
+    admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@example.com" } });
+    session = sessionFor(trainee.id, "TRAINEE");
+    const fixture = await createEphemeralQuiz("سؤال 6: تصحيح يدوي", 600);
+    lesson = fixture.lesson;
+    quiz = fixture.quiz;
+    await markLessonComplete(session, lesson.id);
+
+    const adminSession = sessionFor(admin.id, "ADMIN");
+    const freeText = await createQuestion(adminSession, quiz.id, {
+      type: "FREE_TEXT",
+      prompt: "صف كيف تتعامل مع عميل غاضب.",
+    });
+    await approveQuestion(adminSession, freeText.id);
+  });
+
+  afterAll(async () => {
+    await deleteEphemeralQuiz(lesson.id);
+  });
+
+  it("scores auto-graded answers immediately but leaves score/passed null pending a human grade", async () => {
+    const attempt = await startAttempt(session, quiz.id);
+    const answers = await prisma.attemptAnswer.findMany({ where: { attemptId: attempt.id } });
+    expect(answers).toHaveLength(3); // 2 auto-graded fixture questions + the FREE_TEXT one
+
+    const mcq = answers.find((a) => a.questionType === "MCQ")!;
+    const freeTextAnswer = answers.find((a) => a.questionType === "FREE_TEXT")!;
+    await saveAnswers(session, attempt.id, [
+      { questionId: mcq.questionId!, selectedOption: "a" }, // correct
+      { questionId: freeTextAnswer.questionId!, textAnswer: "أستمع له بهدوء ثم أقترح حلاً." },
+    ]);
+
+    const submitted = await submitAttempt(session, attempt.id);
+    expect(submitted.status).toBe("PENDING_MANUAL_GRADE");
+    expect(submitted.score).toBeNull();
+    expect(submitted.passed).toBeNull();
+
+    const savedAnswers = await prisma.attemptAnswer.findMany({ where: { attemptId: attempt.id } });
+    const savedMcq = savedAnswers.find((a) => a.questionType === "MCQ")!;
+    expect(savedMcq.isCorrect).toBe(true); // auto-graded, computed despite the attempt not being finalized
+
+    const savedFreeText = savedAnswers.find((a) => a.questionType === "FREE_TEXT")!;
+    expect(savedFreeText.textAnswer).toBe("أستمع له بهدوء ثم أقترح حلاً.");
+    expect(savedFreeText.isCorrect).toBeNull(); // untouched until an Admin grades it
   });
 });

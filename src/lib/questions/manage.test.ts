@@ -121,6 +121,19 @@ describe("createQuestion / editQuestion / retireQuestion", () => {
         ForbiddenError,
       );
     });
+
+    it("actually clears options/correctOption when editing an MCQ into a FREE_TEXT (not left stale)", async () => {
+      const question = await createQuestion(sessionFor(admin.id, "ADMIN"), quiz.id, validContent);
+      expect(question.options).not.toBeNull();
+
+      const edited = await editQuestion(sessionFor(admin.id, "ADMIN"), question.id, {
+        type: "FREE_TEXT",
+        prompt: "سؤال حر بعد التعديل",
+      });
+      expect(edited.type).toBe("FREE_TEXT");
+      expect(edited.options).toBeNull();
+      expect(edited.correctOption).toBeNull();
+    });
   });
 
   describe("retireQuestion", () => {

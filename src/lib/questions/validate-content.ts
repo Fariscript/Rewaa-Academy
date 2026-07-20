@@ -1,19 +1,22 @@
 import type { QuestionType } from "@/generated/prisma/client";
+import { AUTO_GRADED_TYPES, MANUALLY_GRADED_TYPES, isAutoGraded } from "./question-types";
 
-const SUPPORTED_TYPES: QuestionType[] = ["MCQ", "TRUE_FALSE"];
+const ALL_TYPES: QuestionType[] = [...AUTO_GRADED_TYPES, ...MANUALLY_GRADED_TYPES];
 
 export interface QuestionContentInput {
   type: unknown;
   prompt: unknown;
-  options: unknown;
-  correctOption: unknown;
+  options?: unknown;
+  correctOption?: unknown;
 }
 
 export interface ValidQuestionContent {
   type: QuestionType;
   prompt: string;
-  options: { id: string; text: string }[];
-  correctOption: string;
+  // Null for manually-graded types (SCENARIO/FREE_TEXT/MOCK_CALL) — no
+  // fixed options or answer key.
+  options: { id: string; text: string }[] | null;
+  correctOption: string | null;
 }
 
 export type ValidationResult =
@@ -28,12 +31,21 @@ export type ValidationResult =
 export function validateQuestionContent(input: QuestionContentInput): ValidationResult {
   const { type, prompt, options, correctOption } = input;
 
-  if (typeof type !== "string" || !SUPPORTED_TYPES.includes(type as QuestionType)) {
+  if (typeof type !== "string" || !ALL_TYPES.includes(type as QuestionType)) {
     return { ok: false, reason: `unsupported question type: ${String(type)}` };
   }
   if (typeof prompt !== "string" || prompt.trim().length === 0) {
     return { ok: false, reason: "empty or missing prompt" };
   }
+
+  const questionType = type as QuestionType;
+
+  if (!isAutoGraded(questionType)) {
+    // T-18: SCENARIO/FREE_TEXT/MOCK_CALL have no fixed options/answer key —
+    // just a prompt, graded manually per response.
+    return { ok: true, value: { type: questionType, prompt: prompt.trim(), options: null, correctOption: null } };
+  }
+
   if (!Array.isArray(options) || options.length === 0) {
     return { ok: false, reason: "empty or missing options" };
   }
@@ -60,7 +72,7 @@ export function validateQuestionContent(input: QuestionContentInput): Validation
   return {
     ok: true,
     value: {
-      type: type as QuestionType,
+      type: questionType,
       prompt: prompt.trim(),
       options: options as { id: string; text: string }[],
       correctOption,
