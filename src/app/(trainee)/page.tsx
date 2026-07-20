@@ -29,6 +29,8 @@ function QuizBadge({ lesson }: { lesson: LearningHomeLesson }) {
 export default async function HomePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  // Admins have no sector content of their own — their home is the admin area.
+  if (session.user.role === "ADMIN") redirect("/admin/quizzes");
 
   const home = await getMyLearningHome(session);
 

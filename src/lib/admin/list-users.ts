@@ -10,7 +10,7 @@ import { requireRole } from "@/lib/auth/rbac";
 export async function listUsers(session: Session | null) {
   requireRole(session, ["ADMIN"]);
   return prisma.user.findMany({
-    select: { id: true, email: true, name: true, role: true },
+    select: { id: true, email: true, name: true, role: true, sectorId: true, sector: { select: { name: true } } },
     orderBy: { email: "asc" },
   });
 }
