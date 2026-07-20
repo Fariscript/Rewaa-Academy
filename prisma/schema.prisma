@@ -34,9 +34,10 @@ model User {
   sectorId String?
   sector   Sector? @relation(fields: [sectorId], references: [id])
 
-  accounts  Account[]
-  sessions  Session[]
-  auditLogs AuditLog[]
+  accounts          Account[]
+  sessions          Session[]
+  auditLogs         AuditLog[]
+  lessonCompletions LessonCompletion[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -112,10 +113,43 @@ model Lesson {
   unitId String
   unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
+  completions LessonCompletion[]
+  quiz        Quiz?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("lessons")
+}
+
+// T-7 (write half): a trainee's completion of a single lesson. This is the
+// signal quiz-unlock (below) reads — see src/lib/content/quiz-unlock.ts.
+model LessonCompletion {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId String
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  completedAt DateTime @default(now())
+
+  @@unique([userId, lessonId])
+  @@map("lesson_completions")
+}
+
+// Bare stub — T-1: one pop quiz per lesson. Slice 4 (Quiz engine) extends
+// this same table with timer/scoring/questions rather than retrofitting the
+// lesson relationship later.
+model Quiz {
+  id       String @id @default(cuid())
+  lessonId String @unique
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  title    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("quizzes")
 }
 
 // NFR-05: audit trail of Admin actions (user creation, sector/role

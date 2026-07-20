@@ -86,12 +86,19 @@ async function seedTaxonomy() {
         });
 
         for (const lessonTitle of unitFixture.lessons) {
-          const existing = await prisma.lesson.findFirst({
+          let lesson = await prisma.lesson.findFirst({
             where: { unitId: unit.id, title: lessonTitle },
           });
-          if (!existing) {
-            await prisma.lesson.create({ data: { title: lessonTitle, unitId: unit.id } });
+          if (!lesson) {
+            lesson = await prisma.lesson.create({ data: { title: lessonTitle, unitId: unit.id } });
           }
+
+          // T-1: a pop quiz appears after each lesson.
+          await prisma.quiz.upsert({
+            where: { lessonId: lesson.id },
+            update: {},
+            create: { lessonId: lesson.id, title: `اختبار: ${lessonTitle}` },
+          });
         }
       }
     }

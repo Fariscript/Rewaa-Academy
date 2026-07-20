@@ -26,15 +26,15 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | FR-25 | Daily reminders, pre-session alerts, “behind” alerts, trainer alerts | - | Not started | | |
 | FR-26 | Successful/failed call library, written feedback, final rating (commun | - | Not started | | |
 | FR-27 | Trainee progress, attendance, trainer performance, department reports | - | Not started | | |
-| T-1 | A pop quiz appears after each lesson and is graded under the same rule | Phase 1 | Not started | | |
+| T-1 | A pop quiz appears after each lesson and is graded under the same rule | Phase 1 | Partial (one Quiz stub per Lesson exists; grading/timer/scoring is slice 4) | prisma/schema.prisma, prisma/seed.ts | src/lib/content/quiz-unlock.test.ts |
 | T-2 | Passing grade is 95% per quiz | Phase 1 | Not started | | |
 | T-3 | 2 attempts per quiz | Phase 1 | Not started | | |
 | T-4 | Certificate auto-generated once all required quizzes are passed (name, | Phase 1 | Not started | | |
 | T-5 | Quizzes are sector-dependent, following each sector's own content layo | Phase 1 | Not started | | |
 | T-6 | Supported question types: multiple choice, true/false, sales scenarios | Phase 1 | Not started | | |
-| T-7 | A quiz unlocks only after its associated lesson is marked complete | Phase 1 | Not started | | |
-| T-8 | Quiz surfaces to the trainee without requiring manual notification fro | Phase 1 | Not started | | |
-| T-9 | Trainee can start a quiz only when prior required content/quizzes are  | Phase 1 | Not started | | |
+| T-7 | A quiz unlocks only after its associated lesson is marked complete | Phase 1 | Done | src/lib/content/lesson-completion.ts, src/lib/content/quiz-unlock.ts | src/lib/content/lesson-completion.test.ts, src/lib/content/quiz-unlock.test.ts |
+| T-8 | Quiz surfaces to the trainee without requiring manual notification fro | Phase 1 | Done (unlock state is computed on read — nothing to manually surface) | src/lib/content/quiz-unlock.ts | src/lib/content/quiz-unlock.test.ts |
+| T-9 | Trainee can start a quiz only when prior required content/quizzes are  | Phase 1 | Partial — touches open item #3b (does this mean sequential ordering across a sector, not just this one lesson? pending CEO confirmation) | src/lib/content/quiz-unlock.ts | src/lib/content/quiz-unlock.test.ts |
 | T-10 | AI drafts candidate questions per lesson/topic | Phase 1 | Not started | | |
 | T-11 | Every AI-drafted question requires human review | Phase 1 | Not started | | |
 | T-12 | Only approved questions are eligible to be served in a live quiz | Phase 1 | Not started | | |
@@ -58,7 +58,7 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | T-30 | Voice-simulation test: AI plays a customer/lead, scores the trainee's  | Phase 2 | Not started | | |
 | T-31 | Voice quiz: AI agent asks the trainee a question aloud; trainee replie | Phase 2 | Not started | | |
 | T-32 | Pop quiz includes a visible countdown timer per attempt; quiz auto-sub | Phase 1 | Not started | | |
-| T-33 | Quiz does not auto-launch when a lesson is marked complete | Phase 1 | Not started | | |
+| T-33 | Quiz does not auto-launch when a lesson is marked complete | Phase 1 | Done (unlock check is read-only; nothing creates an attempt — the Start-button/attempt flow itself is slice 4) | src/lib/content/quiz-unlock.ts, src/lib/content/lesson-completion.ts | src/lib/content/quiz-unlock.test.ts |
 | T-34 | AI Voice Call Training: AI agent conducts a simulated sales call with  | Phase 2 | Not started | | |
 | T-35 | AI Video Grader: trainee uploads a video (e.g. recorded mock call or p | Phase 2 | Not started | | |
 | T-36 | Question bank versioning (see #15) is mirrored at the content level: c | Phase 1 | Not started | | |

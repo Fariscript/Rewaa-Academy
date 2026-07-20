@@ -34,10 +34,15 @@ listed below as a dependency.
 - Identity: **Google Workspace SSO only**, restricted to the company domain.
   No separate password auth for this platform. (FR-02, FR-03, T-27)
 - **Arabic-only UI.** (NFR-09)
-- Manager dashboard is **basic in Phase 1 on purpose**: who's completed a
-  quiz, who hasn't, who's on attempt 2, average scores, a flag for anyone
-  who failed both attempts. Do not build deeper analytics/trends early —
-  that's explicitly Phase 2. (T-21–T-24)
+- **Dashboard is one shared component/route, role-gated — not two separate
+  builds.** Trainer/Training Manager sees: who's completed a quiz, who
+  hasn't, who's on attempt 2, average scores, a flag for anyone who failed
+  both attempts. Admin sees the same view, plus the admin-only controls
+  already listed in the Roles table layered on top (taxonomy management,
+  sector assign/reassign, attempt overrides) — no new admin capabilities
+  beyond what's already defined there. Still **basic in Phase 1 on
+  purpose** — do not build deeper analytics/trends early, that's explicitly
+  Phase 2. (T-21–T-24)
 
 ## Roles
 
@@ -73,6 +78,11 @@ roleplay (T-30), deeper dashboard analytics (T-24).
 2. Sector reassignment mid-program — does quiz progress carry over or reset?
 3. Who owns the lesson-complete → quiz-unlock check: the testing engine or
    the content system?
+3b. T-9 ("prior required content/quizzes are complete") may mean sequential
+    ordering across a sector's whole lesson sequence, not just single-lesson
+    unlock. Needs confirming with the CEO before Phase 1 launch — retrofitting
+    order-enforcement after trainees already have unordered access is
+    expensive to unwind.
 4. Does manual grading need to hit the same 95% bar, or is it trainer
    judgment?
 5. Notification rules (triggers, channels, wording) — not yet defined.
