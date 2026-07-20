@@ -23,6 +23,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <Link href="/admin/quizzes" className="text-neutral-600 hover:underline dark:text-neutral-300">
                 الاختبارات
               </Link>
+              <Link href="/admin/grading" className="text-neutral-600 hover:underline dark:text-neutral-300">
+                التصحيح
+              </Link>
               <Link href="/admin/trainees" className="text-neutral-600 hover:underline dark:text-neutral-300">
                 المتدربون
               </Link>
