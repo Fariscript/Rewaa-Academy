@@ -46,9 +46,9 @@ Living tracker. Update the Status/Files/Tests columns as each requirement is imp
 | T-18 | Scenario / free-text items are routed to the Trainer for manual gradin | Phase 1 | Done (routed to Admin — role collapse) | src/lib/quiz/attempt-lifecycle.ts, src/lib/grading/grading.ts | src/lib/quiz/attempt-flow.test.ts, src/lib/grading/grading.test.ts |
 | T-19 | Engine records trainee ID, quiz ID, timestamp, answers, score, and out | Phase 1 | Done | prisma/schema.prisma (Attempt, AttemptAnswer) | src/lib/quiz/start-attempt.test.ts, src/lib/quiz/attempt-flow.test.ts |
 | T-20 | 2-attempt cap enforced; higher score is the trainee's final result | Phase 1 | Done | src/lib/quiz/start-attempt.ts, src/lib/quiz/outcome.ts | src/lib/quiz/outcome.test.ts |
-| T-21 | Shows which trainees have/haven't completed each quiz, and who's on at | Phase 1 | Not started | | |
-| T-22 | Shows average scores across a cohort | Phase 1 | Not started | | |
-| T-23 | Flags trainees who failed both attempts | Phase 1 | Not started | | |
+| T-21 | Shows which trainees have/haven't completed each quiz, and who's on at | Phase 1 | Done | src/lib/dashboard/quiz-dashboard.ts | src/lib/dashboard/quiz-dashboard.test.ts |
+| T-22 | Shows average scores across a cohort | Phase 1 | Done (cohort = trainees assigned to the quiz's sector) | src/lib/dashboard/quiz-dashboard.ts | src/lib/dashboard/quiz-dashboard.test.ts |
+| T-23 | Flags trainees who failed both attempts | Phase 1 | Done | src/lib/dashboard/quiz-dashboard.ts | src/lib/dashboard/quiz-dashboard.test.ts |
 | T-24 | Per-trainee performance reports and training-level trends | Phase 2 | Not started | | |
 | T-25 | Trainer can view submitted assignments/mock calls and enter a grade wi | Phase 1 | Done (Admin — role collapse) | src/lib/grading/grading.ts | src/lib/grading/grading.test.ts |
 | T-26 | Manually graded items follow the same 95% / 2-attempt logic as auto-gr | Phase 1 | Blocked — STOP, see CLAUDE.md open item #4. Per-item grades are captured (T-25) but nothing converts a fully-graded attempt into an overall score/passed; the attempt stays PENDING_MANUAL_GRADE indefinitely until that rule is decided. TODO(open-item-4) at src/lib/grading/grading.ts and src/lib/quiz/attempt-lifecycle.ts | | |

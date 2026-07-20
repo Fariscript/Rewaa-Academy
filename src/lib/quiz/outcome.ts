@@ -2,6 +2,7 @@ import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, NotFoundError, UnauthenticatedError } from "@/lib/errors";
 import { syncExpiry } from "./attempt-lifecycle";
+import type { Attempt } from "@/generated/prisma/client";
 
 export type QuizOutcomeStatus =
   | "NOT_STARTED"
@@ -23,30 +24,15 @@ export interface QuizOutcome {
 // consume an attempt slot but are deliberately excluded from the
 // score/passed computation — they have no score yet, and CLAUDE.md open
 // item #4 means there's no rule for what one would even mean here.
-export async function getQuizOutcome(session: Session | null, quizId: string): Promise<QuizOutcome> {
-  if (!session?.user) throw new UnauthenticatedError();
-
-  const quiz = await prisma.quiz.findUnique({
-    where: { id: quizId },
-    select: { lesson: { select: { unit: { select: { subSector: { select: { sectorId: true } } } } } } },
-  });
-  if (!quiz) throw new NotFoundError("Quiz not found");
-
-  const caller = await prisma.user.findUniqueOrThrow({
-    where: { id: session.user.id },
-    select: { sectorId: true },
-  });
-  if (!caller.sectorId || caller.sectorId !== quiz.lesson.unit.subSector.sectorId) {
-    throw new ForbiddenError("Quiz is outside your assigned sector");
-  }
-
-  const attempts = await prisma.attempt.findMany({ where: { userId: session.user.id, quizId } });
-  const synced = await Promise.all(attempts.map((a) => syncExpiry(a.id)));
-
-  const graded = synced.filter((a) => a.status === "SUBMITTED" || a.status === "AUTO_SUBMITTED");
-  const hasPendingGrade = synced.some((a) => a.status === "PENDING_MANUAL_GRADE");
-  const hasInProgress = synced.some((a) => a.status === "IN_PROGRESS");
-  const attemptsUsed = synced.filter((a) => a.status !== "IN_PROGRESS").length;
+//
+// Pure — takes already-syncExpiry'd attempts so it's reusable by both a
+// trainee's own outcome view (below) and the Admin dashboard (slice 7,
+// src/lib/dashboard/), which computes this per-trainee across a cohort.
+export function computeQuizOutcome(syncedAttempts: Attempt[]): QuizOutcome {
+  const graded = syncedAttempts.filter((a) => a.status === "SUBMITTED" || a.status === "AUTO_SUBMITTED");
+  const hasPendingGrade = syncedAttempts.some((a) => a.status === "PENDING_MANUAL_GRADE");
+  const hasInProgress = syncedAttempts.some((a) => a.status === "IN_PROGRESS");
+  const attemptsUsed = syncedAttempts.filter((a) => a.status !== "IN_PROGRESS").length;
 
   const bestScore = graded.length > 0 ? Math.max(...graded.map((a) => a.score ?? 0)) : null;
   const passed = graded.some((a) => a.passed === true);
@@ -76,4 +62,27 @@ export async function getQuizOutcome(session: Session | null, quizId: string): P
   }
 
   return { attemptsUsed, bestScore, passed, status };
+}
+
+export async function getQuizOutcome(session: Session | null, quizId: string): Promise<QuizOutcome> {
+  if (!session?.user) throw new UnauthenticatedError();
+
+  const quiz = await prisma.quiz.findUnique({
+    where: { id: quizId },
+    select: { lesson: { select: { unit: { select: { subSector: { select: { sectorId: true } } } } } } },
+  });
+  if (!quiz) throw new NotFoundError("Quiz not found");
+
+  const caller = await prisma.user.findUniqueOrThrow({
+    where: { id: session.user.id },
+    select: { sectorId: true },
+  });
+  if (!caller.sectorId || caller.sectorId !== quiz.lesson.unit.subSector.sectorId) {
+    throw new ForbiddenError("Quiz is outside your assigned sector");
+  }
+
+  const attempts = await prisma.attempt.findMany({ where: { userId: session.user.id, quizId } });
+  const synced = await Promise.all(attempts.map((a) => syncExpiry(a.id)));
+
+  return computeQuizOutcome(synced);
 }
