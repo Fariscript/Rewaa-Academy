@@ -22,9 +22,14 @@ describe("listUsers (GET /api/admin/users)", () => {
     },
   );
 
-  it("allows ADMIN and returns the seeded fixture users", async () => {
+  it("allows ADMIN and returns at least the seeded fixture users", async () => {
+    // Not an exact-set match: other test files create their own short-lived
+    // fixture users against this same DB, and vitest runs files concurrently
+    // by default, so other users may legitimately exist at the same time.
     const users = await listUsers(sessionFor("ADMIN"));
-    const emails = users.map((u) => u.email).sort();
-    expect(emails).toEqual(["admin@example.com", "trainee@example.com", "trainer@example.com"]);
+    const emails = users.map((u) => u.email);
+    expect(emails).toEqual(
+      expect.arrayContaining(["admin@example.com", "trainee@example.com", "trainer@example.com"]),
+    );
   });
 });
