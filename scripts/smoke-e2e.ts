@@ -33,6 +33,9 @@
  *      queue empties, attempt honestly stays pending
  *   9. sector select (browser): optimistic value during the PATCH
  *      round-trip, persisted assignment, then restored
+ *  10. question bank (browser): create a manual question via the form
+ *      (lands DRAFT — no approval bypass), approve it, edit it (resets to
+ *      DRAFT with a revision), re-approve, retire; audit rows asserted
  */
 import { randomBytes } from "node:crypto";
 import { Client } from "pg";
@@ -491,6 +494,88 @@ async function stageSectorSelectBrowser(ctx: Ctx, browser: Browser) {
   await page.close();
 }
 
+const SMOKE_MCQ_PROMPT = "سؤال دخاني يدوي: ما أفضل رد على تردد العميل؟";
+const SMOKE_MCQ_PROMPT_EDITED = "سؤال دخاني معدل: ما أفضل رد على تردد العميل؟";
+
+async function stageQuestionBankBrowser(ctx: Ctx, browser: Browser, lesson: { id: string; quizId: string }) {
+  await ctx.db.query("DELETE FROM questions WHERE prompt IN ($1, $2)", [SMOKE_MCQ_PROMPT, SMOKE_MCQ_PROMPT_EDITED]);
+
+  const page = await adminPage(ctx, browser);
+
+  // Create via the form → lands in the DRAFT group (no approval bypass).
+  await page.goto(`${BASE}/admin/quizzes/${lesson.quizId}/questions/new`);
+  await page.locator("#q-prompt").fill(SMOKE_MCQ_PROMPT);
+  await page.locator("input[placeholder='الخيار 1']").fill("أستمع وأعالج سبب التردد");
+  await page.locator("input[placeholder='الخيار 2']").fill("أضغط عليه ليشتري فوراً");
+  await page.locator("input[name='mcq-correct']").first().check();
+  await page.getByRole("button", { name: "حفظ السؤال" }).click();
+  await page.waitForURL(/\/questions$/);
+  await page.waitForSelector(`text=${SMOKE_MCQ_PROMPT}`);
+  const { rows: created } = await ctx.db.query("SELECT id, status, source FROM questions WHERE prompt=$1", [
+    SMOKE_MCQ_PROMPT,
+  ]);
+  if (created[0]?.status === "DRAFT" && created[0]?.source === "MANUAL") {
+    pass("qbank-create", "manual question created as DRAFT");
+  } else {
+    fail("qbank-create", JSON.stringify(created[0]));
+    await page.close();
+    return;
+  }
+  const questionId = created[0].id;
+
+  // Approve via the button (ours is the only DRAFT — seeded questions are APPROVED).
+  await page.getByRole("button", { name: "اعتماد" }).first().click();
+  await page.waitForTimeout(1500);
+  const { rows: approved } = await ctx.db.query("SELECT status FROM questions WHERE id=$1", [questionId]);
+  if (approved[0].status === "APPROVED") pass("qbank-approve", "hard gate exercised through the UI");
+  else fail("qbank-approve", `status ${approved[0].status}`);
+
+  // Edit → resets to DRAFT and archives a revision.
+  await page.goto(`${BASE}/admin/questions/${questionId}`);
+  await page.waitForSelector("text=تعديل سؤال معتمد يعيده إلى مسودة");
+  await page.locator("#q-prompt").fill(SMOKE_MCQ_PROMPT_EDITED);
+  await page.getByRole("button", { name: "حفظ السؤال" }).click();
+  await page.waitForURL(/\/questions$/);
+  const { rows: edited } = await ctx.db.query(
+    `SELECT q.status, (SELECT count(*) FROM question_revisions r WHERE r."questionId"=q.id) AS revisions
+     FROM questions q WHERE q.id=$1`,
+    [questionId],
+  );
+  if (edited[0].status === "DRAFT" && Number(edited[0].revisions) === 1) {
+    pass("qbank-edit", "edit reset APPROVED → DRAFT and archived a revision");
+  } else {
+    fail("qbank-edit", JSON.stringify(edited[0]));
+  }
+
+  // Re-approve, then retire — scoped to OUR question's card (several other
+  // APPROVED questions exist on the page).
+  await page.reload();
+  await page.getByRole("button", { name: "اعتماد" }).first().click();
+  await page.waitForTimeout(1500);
+  await page
+    .locator("div.rounded-lg", { hasText: SMOKE_MCQ_PROMPT_EDITED })
+    .getByRole("button", { name: "سحب من التداول" })
+    .click();
+  await page.waitForTimeout(1500);
+  const { rows: retired } = await ctx.db.query("SELECT status FROM questions WHERE id=$1", [questionId]);
+  if (retired[0].status === "RETIRED") pass("qbank-retire", "approved question withdrawn");
+  else fail("qbank-retire", `status ${retired[0].status}`);
+
+  const { rows: audits } = await ctx.db.query(
+    `SELECT action, count(*) FROM audit_logs WHERE "targetId"=$1 GROUP BY action`,
+    [questionId],
+  );
+  const actions = new Set(audits.map((a) => a.action));
+  if (["question_created", "question_approved", "question_edited", "question_retired"].every((a) => actions.has(a))) {
+    pass("qbank-audit", "created/approved/edited/retired all audit-logged");
+  } else {
+    fail("qbank-audit", `actions seen: ${[...actions].join(", ")}`);
+  }
+
+  await ctx.db.query("DELETE FROM questions WHERE id=$1", [questionId]);
+  await page.close();
+}
+
 async function main() {
   const db = new Client({ connectionString: databaseUrl });
   await db.connect();
@@ -522,6 +607,7 @@ async function main() {
         await stageAdminDashboardBrowser(ctx, browser, lessons[0]);
         await stageGradingBrowser(ctx, browser, lessons[1]);
         await stageSectorSelectBrowser(ctx, browser);
+        await stageQuestionBankBrowser(ctx, browser, lessons[0]);
       } finally {
         await browser.close();
       }

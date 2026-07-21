@@ -74,10 +74,14 @@ next until the current one has tests passing and is reviewed):
 attempt read API + answer-key redaction, admin quiz catalog +
 attempt-cap override, CI, and the full trainee + admin UI (home/lesson/
 quiz-runner-with-countdown/result/certificate; admin dashboard/trainees/
-grading). The question-bank UI (slice 16) is written down but **held
-behind the 5b verification** per the no-stacking rule in Blocked below.
-FR-18 taxonomy CUD and T-36 are deferred to Ibrahim's content track
-(owner decision, recorded in docs/fr-to-code.md).
+grading). FR-18 taxonomy CUD and T-36 are deferred to Ibrahim's content
+track (owner decision, recorded in docs/fr-to-code.md).
+
+**Slice 16 (question-bank UI) shipped 2026-07-21 by owner directive**,
+lifting the earlier hold: the UI sits over APIs that were already fully
+tested, and only the AI *generation* call remains unverified — the 5b
+verification run in Blocked below is still required the moment a real
+key exists, and the AI-draft panel's copy reflects that.
 
 **Phase 2** (do not start until Phase 1 has shipped and been reviewed):
 Voice quiz (AI asks aloud, trainee replies verbally, AI evaluates — T-31),

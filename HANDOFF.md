@@ -65,6 +65,14 @@ placeholder home. A second build run closed that:
   PENDING_MANUAL_GRADE (cap still enforced; UI doesn't offer it);
   sector-select shows the old value while its PATCH is in flight.
 
+- **2026-07-21, by explicit owner directive ("continue working on the
+  next phases"):** slice 16 (question-bank UI) built — the hold was lifted
+  since its APIs were already tested; the AI-generation verify
+  (`scripts/verify-ai-drafter.ts`) is STILL required once a key exists.
+  Smoke gained 5 question-bank stages (create→approve→edit→re-approve→
+  retire with audit assertions). Phase 2's key-independent item (T-24
+  analytics) is next; the AI-powered Phase 2 features and T-26 remain
+  blocked on the key and open item #4 respectively.
 - **Perf sanity (NFR-08/NFR-16), measured 2026-07-20 via
   `scripts/perf-sanity.ts`** (throwaway 301-trainee cohort, 600 finalized
   attempts, dev server medians): per-quiz admin dashboard **~71ms** (was

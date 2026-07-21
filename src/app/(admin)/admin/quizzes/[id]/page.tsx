@@ -47,9 +47,15 @@ export default async function AdminQuizDashboardPage({ params }: { params: Promi
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <Link href="/admin/quizzes" className="text-sm text-neutral-500 hover:underline dark:text-neutral-400">
           → كل الاختبارات
+        </Link>
+        <Link
+          href={`/admin/quizzes/${dashboard.quizId}/questions`}
+          className="text-sm text-neutral-600 hover:underline dark:text-neutral-300"
+        >
+          بنك الأسئلة
         </Link>
       </div>
       <PageHeader title={dashboard.quizTitle} />
