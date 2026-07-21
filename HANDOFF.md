@@ -47,10 +47,13 @@ yourself if this doc is more than a few days old.
   `FarisAlsaif`, adding a one-line file named `fairs` containing "Salam".
   Harmless, but flagged again since nothing in this session's history
   explains it — confirm it was intentional.
-- **Branch protection on `main` is not yet configured**, and the merged
-  remote branch `origin/claude/handoff-project-plan-1e20yo` still exists
-  (points at the same commit as `main`, not yet deleted). Commands for
-  both were drafted this session for review, not run.
+- **Branch protection on `main` is intentionally NOT enabled yet** (not an
+  oversight — see "Working without branch protection" below for what
+  substitutes for it in the meantime), and the merged remote branch
+  `origin/claude/handoff-project-plan-1e20yo` still exists (points at the
+  same commit as `main`, not yet deleted). `gh` commands for both branch
+  protection and the branch delete were drafted this session for Faris's
+  review, not run.
 
 ### Open business-rule items — current state after the merge
 
@@ -90,14 +93,32 @@ among the six; unchanged by the merge.)
 ### Parallel sessions — work is now split
 
 As of 2026-07-21, work on this repo is split across two parallel Claude
-Code sessions, per Faris:
+Code sessions, per Faris. The split is by *ownership of concern*, not by
+directory — both sides touch overlapping files, which is exactly why the
+"Shared files" list below matters:
 
-- **This session** (local) — owns the testing/quizzing engine (this
-  file's whole subject) plus statistics/analytics (T-24 and onward).
-- **A separate session** — owns the LMS/content-authoring track. This
-  matches `CLAUDE.md`'s original owner line ("Content management is a
-  separate track (Ibrahim)"), now made concrete as an actual parallel
-  Claude Code session rather than just a future/hypothetical boundary.
+- **This session (testing platform + statistics)** — the quiz runner
+  (attempt lifecycle, countdown/autosave, scoring), attempts (start/save/
+  submit/read views, the 2-attempt cap and overrides), grading (manual
+  grading queue + finalization), results (outcome computation, the result
+  page), certificates (issuance, PDF, signing/verification), and admin
+  dashboard statistics (per-quiz dashboard tiles, trainee reports, quiz
+  trends). Also owns **how a trainee's sector assignment drives which
+  question bank they're tested from** — i.e. the read side of `sectorId`,
+  from quiz assembly's perspective.
+- **Ibrahim's session (LMS)** — the trainee UI foundation (shell, layout,
+  navigation), the admin shell, **the sector-assignment UI and admin
+  action itself** (the write side of `sectorId` — assigning/reassigning a
+  trainee), and how a trainee's sector drives which courses/content they
+  see. This matches `CLAUDE.md`'s original owner line ("Content management
+  is a separate track (Ibrahim)"), now made concrete as an actual parallel
+  Claude Code session.
+
+The sector-assignment boundary is the sharpest edge between the two: the
+`sectorId` field and its assignment action belong to Ibrahim's track;
+this session only ever *reads* it to decide which quizzes/questions a
+trainee sees. Neither side should change what `sectorId` means or how
+it's set without the other knowing.
 
 The slice 16 and T-24 commits merged today were built by a *third*
 identifiable session (`Claude-Session:
@@ -109,38 +130,49 @@ verify independently.
 
 ### Shared files — coordinate before either side edits these
 
-Both tracks read and write the same repo; these are the files where an
-uncoordinated concurrent edit is most likely to silently clobber the
-other side's work (this session hit exactly this failure mode once
-already today, with two sessions both editing `package.json`'s scripts
-block near-simultaneously):
+This is the specific, curated list (per Faris, replacing this session's
+earlier broader guess) of files where an uncoordinated concurrent edit
+from either track is most likely to silently clobber the other side's
+work — this session hit exactly this failure mode once already today,
+with two sessions both editing `package.json`'s scripts block
+near-simultaneously:
 
-- **`prisma/schema.prisma` and `prisma/migrations/`** — one shared schema
-  file and one ordered migration history for both the content models
-  (Sector/SubSector/Unit/Lesson) and the testing models (Quiz/Question/
-  Attempt/Certificate). Migrations are strictly sequential — concurrent
-  authoring from two sides risks either a numbering collision or a
-  migration history that diverges between the two sessions' local DBs.
-- **`prisma/seed.ts`** — shared fixture data (taxonomy + the two role
-  fixture users) that both tracks' tests key off.
-- **`docs/fr-to-code.md`** — the single FR/T/NFR traceability table both
-  tracks update per their own CLAUDE.md instruction.
-- **`CLAUDE.md` and `HANDOFF.md`** — the two living cross-track docs
-  themselves. Both sessions have already independently edited both files
-  this week.
-- **`src/lib/auth/rbac.ts` and `src/auth.ts`** — the single `requireRole()`
-  gate and NextAuth config. Any content-side permission check should go
-  through the same gate rather than a parallel mechanism.
-- **`src/app/(trainee)/layout.tsx` and `src/app/(admin)/admin/layout.tsx`**
-  — shared UI shells; a content-authoring page would nest under one of
-  these, so changes to shared nav/shell structure affect both tracks'
-  pages.
-- **`.github/workflows/ci.yml`** — one shared CI pipeline.
-- **`.env.example` / `.env`** — one shared env-var manifest; a new
-  content-track var (e.g. video storage credentials) needs to coexist
-  with the testing engine's existing list without collision.
+- **`prisma/schema.prisma`, especially the `Sector` model** — the one
+  data model both tracks depend on for opposite reasons (Ibrahim writes
+  assignment, this session reads it for quiz/question scoping). Any shape
+  change to `Sector` or `sectorId` needs both sides in the loop before it
+  lands, not after.
+- **`src/auth.ts`** — the single NextAuth config (providers, session
+  strategy, callbacks) both tracks' routes and pages sit behind.
+- **`src/lib/dev/demo-users.ts`** — the fixed demo-account allow-list used
+  by the local-only `DEV_LOGIN_ENABLED` flow; both tracks' demo/smoke
+  flows depend on these 3 accounts staying stable.
+- **The admin shell/layout** (`src/app/(admin)/admin/layout.tsx`) — owned
+  by Ibrahim's track, but this session's admin pages (dashboard, grading,
+  trainees) all nest under it, so shell/nav changes ripple into both.
 - **`package.json`** — shared dependency/script manifest — the exact file
   that already collided once today.
+- **CI config** (`.github/workflows/ci.yml`) — one shared pipeline both
+  tracks' tests and builds run through.
+- **`.claude/hooks/session-start.sh`** — the shared cloud/web-session
+  bootstrap (Postgres provisioning, `.env`/`.env.test` synthesis, migrate
+  + seed for both DBs); a change here affects the environment both
+  sessions' web/cloud instances start from.
+
+### Working without branch protection — the discipline
+
+Branch protection on `main` is intentionally off for now (see above) —
+this is a deliberate choice, not a gap waiting to be filled, and it means
+both sessions are relying on discipline instead of a server-side gate
+until it's turned on:
+
+1. **Never push directly to `main`.**
+2. **Always work on a named branch**, not directly on `main` locally.
+3. **Pull `main` at the start of every session**, before doing anything
+   else — given two tracks are landing work independently (as today's
+   `git pull` mid-merge surfaced two commits neither side had told the
+   other about), starting from a stale `main` is the likeliest way to
+   produce exactly the kind of surprise this addendum documents.
 
 ## Update 2026-07-20: slices 9–15 — the UI/API completion run
 
