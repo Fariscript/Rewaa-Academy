@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { getQuizDashboard } from "@/lib/dashboard/quiz-dashboard";
+import { getQuizTrends } from "@/lib/dashboard/quiz-trends";
 import { NotFoundError } from "@/lib/errors";
+import { formatDate } from "@/lib/dates";
 import { QUIZ_STATUS_LABELS } from "@/lib/content/labels";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -35,9 +37,10 @@ export default async function AdminQuizDashboardPage({ params }: { params: Promi
   const session = await auth();
   const { id } = await params;
 
-  let dashboard;
+  let dashboard, trends;
   try {
     dashboard = await getQuizDashboard(session, id);
+    trends = await getQuizTrends(session, id);
   } catch (error) {
     if (error instanceof NotFoundError) notFound();
     throw error;
@@ -109,6 +112,75 @@ export default async function AdminQuizDashboardPage({ params }: { params: Promi
           </tbody>
         </table>
       </Card>
+
+      {/* T-24 (Phase 2): training-level trends — finalized attempts only. */}
+      <h2 className="mb-3 mt-8 text-lg font-bold">التحليلات</h2>
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <Card className="flex-1 overflow-x-auto p-0">
+          <p className="p-3 pb-0 font-medium">آخر 8 أسابيع</p>
+          <table className="w-full min-w-[420px] text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 dark:border-neutral-800">
+                <th className="p-3 text-start font-medium">الأسبوع</th>
+                <th className="p-3 text-start font-medium">المحاولات</th>
+                <th className="p-3 text-start font-medium">متوسط الدرجات</th>
+                <th className="p-3 text-start font-medium">نسبة النجاح</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              {trends.weekly.map((week) => (
+                <tr key={week.weekStart.toISOString()}>
+                  <td className="p-3">{formatDate(week.weekStart)}</td>
+                  <td className="p-3" dir="ltr">
+                    {week.attempts}
+                  </td>
+                  <td className="p-3" dir="ltr">
+                    {week.averageScore === null ? "—" : `${Math.round(week.averageScore)}%`}
+                  </td>
+                  <td className="p-3" dir="ltr">
+                    {week.passRate === null ? "—" : `${Math.round(week.passRate * 100)}%`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+        <Card className="flex-1 overflow-x-auto p-0 lg:max-w-sm">
+          <p className="p-3 pb-0 font-medium">حسب رقم المحاولة</p>
+          {trends.byAttemptNumber.length === 0 ? (
+            <p className="p-3 text-sm text-neutral-500 dark:text-neutral-400">لا محاولات مكتملة بعد.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-neutral-200 dark:border-neutral-800">
+                  <th className="p-3 text-start font-medium">المحاولة</th>
+                  <th className="p-3 text-start font-medium">العدد</th>
+                  <th className="p-3 text-start font-medium">المتوسط</th>
+                  <th className="p-3 text-start font-medium">النجاح</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                {trends.byAttemptNumber.map((row) => (
+                  <tr key={row.attemptNumber}>
+                    <td className="p-3" dir="ltr">
+                      {row.attemptNumber}
+                    </td>
+                    <td className="p-3" dir="ltr">
+                      {row.attempts}
+                    </td>
+                    <td className="p-3" dir="ltr">
+                      {row.averageScore === null ? "—" : `${Math.round(row.averageScore)}%`}
+                    </td>
+                    <td className="p-3" dir="ltr">
+                      {row.passRate === null ? "—" : `${Math.round(row.passRate * 100)}%`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

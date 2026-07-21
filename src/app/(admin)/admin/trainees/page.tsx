@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { auth } from "@/auth";
 import { listUsers } from "@/lib/admin/list-users";
 import { getFullTaxonomy } from "@/lib/content/taxonomy";
@@ -30,7 +31,13 @@ export default async function AdminTraineesPage() {
             {users.map((user) => (
               <tr key={user.id}>
                 <td className="p-3">
-                  <p className="font-medium">{user.name ?? user.email}</p>
+                  {user.role === "TRAINEE" ? (
+                    <Link href={`/admin/trainees/${user.id}`} className="font-medium hover:underline">
+                      {user.name ?? user.email}
+                    </Link>
+                  ) : (
+                    <p className="font-medium">{user.name ?? user.email}</p>
+                  )}
                   <p className="text-neutral-500 dark:text-neutral-400" dir="ltr">
                     {user.email}
                   </p>
