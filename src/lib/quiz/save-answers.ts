@@ -38,5 +38,8 @@ export async function saveAnswers(session: Session | null, attemptId: string, an
     }),
   );
 
-  return prisma.attempt.findUniqueOrThrow({ where: { id: attemptId }, include: { answers: true } });
+  return prisma.attempt.findUniqueOrThrow({
+    where: { id: attemptId },
+    include: { answers: { orderBy: { id: "asc" } }, quiz: true },
+  });
 }

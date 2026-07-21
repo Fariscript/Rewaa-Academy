@@ -2,13 +2,14 @@ import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, NotFoundError, UnauthenticatedError } from "@/lib/errors";
 import { isQuizUnlocked } from "@/lib/content/quiz-unlock";
+import { getAllowedAttempts } from "@/lib/admin/attempt-override";
 import { syncExpiry } from "./attempt-lifecycle";
 
-const MAX_ATTEMPTS = 2;
-
 // T-7/T-33: the Start button — an attempt is created only on this explicit
-// call, never by unlocking. T-3/T-20: capped at 2 attempts; the cap itself
-// is enforced unconditionally here regardless of pass/fail (see
+// call, never by unlocking. T-3/T-20: capped at 2 attempts (the immutable
+// DEFAULT_MAX_ATTEMPTS in src/lib/admin/attempt-override.ts) unless an
+// Admin has explicitly granted this trainee extra attempts on this quiz;
+// the cap is enforced unconditionally regardless of pass/fail (see
 // src/lib/quiz/outcome.ts for the still-open question of what happens
 // *after* both fail — that's a separate, stubbed concern from this cap).
 export async function startAttempt(session: Session | null, quizId: string) {
@@ -42,7 +43,8 @@ export async function startAttempt(session: Session | null, quizId: string) {
   if (synced.some((a) => a.status === "IN_PROGRESS")) {
     throw new ForbiddenError("An attempt is already in progress");
   }
-  if (synced.length >= MAX_ATTEMPTS) {
+  const allowedAttempts = await getAllowedAttempts(session.user.id, quizId);
+  if (synced.length >= allowedAttempts) {
     throw new ForbiddenError("Maximum attempts reached");
   }
 

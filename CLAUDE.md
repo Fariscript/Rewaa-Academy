@@ -70,6 +70,19 @@ next until the current one has tests passing and is reviewed):
 7. Manager dashboard (basic version only)
 8. Certificate generation
 
+**Phase 1 completion run (shipped 2026-07-20, slices 9–15):** trainee
+attempt read API + answer-key redaction, admin quiz catalog +
+attempt-cap override, CI, and the full trainee + admin UI (home/lesson/
+quiz-runner-with-countdown/result/certificate; admin dashboard/trainees/
+grading). FR-18 taxonomy CUD and T-36 are deferred to Ibrahim's content
+track (owner decision, recorded in docs/fr-to-code.md).
+
+**Slice 16 (question-bank UI) shipped 2026-07-21 by owner directive**,
+lifting the earlier hold: the UI sits over APIs that were already fully
+tested, and only the AI *generation* call remains unverified — the 5b
+verification run in Blocked below is still required the moment a real
+key exists, and the AI-draft panel's copy reflects that.
+
 **Phase 2** (do not start until Phase 1 has shipped and been reviewed):
 Voice quiz (AI asks aloud, trainee replies verbally, AI evaluates — T-31),
 AI Voice Call Training (coaching simulation, not scored — T-34), AI Video
@@ -124,7 +137,16 @@ touching the related code.
   site already passes an attemptId that was pre-verified as belonging to the
   caller — but a future route calling either directly with a client-supplied
   attemptId would have no independent safeguard against acting on another
-  trainee's attempt.
+  trainee's attempt. (`getAttemptForTrainee` in `src/lib/quiz/attempt-view.ts`
+  is the precedent: ownership check first, then `syncExpiry`.)
+- **Answer-key redaction boundary:** `AttemptAnswer` rows snapshot
+  `correctOption`. Raw rows must NEVER be serialized to a trainee-facing
+  boundary — not in a route response and not as an RSC page prop (props
+  reach the client). Every trainee-facing attempt read goes through
+  `toTraineeAttemptView` (`src/lib/quiz/attempt-view.ts`), which omits
+  `correctOption` unconditionally and hides `isCorrect`/`feedback` while
+  IN_PROGRESS. Slice 9 fixed a live mid-attempt leak in the save-answers
+  response caused by skipping this.
 
 ## Slice 5 decisions (question bank)
 

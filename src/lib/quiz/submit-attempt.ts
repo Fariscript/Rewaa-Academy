@@ -18,5 +18,8 @@ export async function submitAttempt(session: Session | null, attemptId: string) 
     await finalizeAttempt(attemptId, "SUBMITTED");
   }
 
-  return prisma.attempt.findUniqueOrThrow({ where: { id: attemptId }, include: { answers: true } });
+  return prisma.attempt.findUniqueOrThrow({
+    where: { id: attemptId },
+    include: { answers: { orderBy: { id: "asc" } }, quiz: true },
+  });
 }

@@ -1,6 +1,7 @@
 import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, NotFoundError, UnauthenticatedError } from "@/lib/errors";
+import { getAllowedAttempts } from "@/lib/admin/attempt-override";
 import { syncExpiry } from "./attempt-lifecycle";
 import type { Attempt } from "@/generated/prisma/client";
 
@@ -13,6 +14,9 @@ export type QuizOutcomeStatus =
 
 export interface QuizOutcome {
   attemptsUsed: number;
+  // 2 (DEFAULT_MAX_ATTEMPTS) unless an Admin granted this trainee extra
+  // attempts on this quiz — see src/lib/admin/attempt-override.ts.
+  attemptsAllowed: number;
   bestScore: number | null;
   passed: boolean;
   status: QuizOutcomeStatus;
@@ -28,7 +32,7 @@ export interface QuizOutcome {
 // Pure — takes already-syncExpiry'd attempts so it's reusable by both a
 // trainee's own outcome view (below) and the Admin dashboard (slice 7,
 // src/lib/dashboard/), which computes this per-trainee across a cohort.
-export function computeQuizOutcome(syncedAttempts: Attempt[]): QuizOutcome {
+export function computeQuizOutcome(syncedAttempts: Attempt[], attemptsAllowed = 2): QuizOutcome {
   const graded = syncedAttempts.filter((a) => a.status === "SUBMITTED" || a.status === "AUTO_SUBMITTED");
   const hasPendingGrade = syncedAttempts.some((a) => a.status === "PENDING_MANUAL_GRADE");
   const hasInProgress = syncedAttempts.some((a) => a.status === "IN_PROGRESS");
@@ -44,7 +48,7 @@ export function computeQuizOutcome(syncedAttempts: Attempt[]): QuizOutcome {
     // Not yet known whether this will end up passed or failed — don't
     // preempt that with FAILED_FINAL_ATTEMPT while grading is outstanding.
     status = "AWAITING_MANUAL_GRADE";
-  } else if (attemptsUsed >= 2) {
+  } else if (attemptsUsed >= attemptsAllowed) {
     // TODO(open-item-1): what happens after both attempts fail — blocked,
     // flagged for manual review, or something else — is still unresolved.
     // This status is purely informational today: it feeds T-23's dashboard
@@ -61,7 +65,7 @@ export function computeQuizOutcome(syncedAttempts: Attempt[]): QuizOutcome {
     status = "NOT_STARTED";
   }
 
-  return { attemptsUsed, bestScore, passed, status };
+  return { attemptsUsed, attemptsAllowed, bestScore, passed, status };
 }
 
 export async function getQuizOutcome(session: Session | null, quizId: string): Promise<QuizOutcome> {
@@ -83,6 +87,7 @@ export async function getQuizOutcome(session: Session | null, quizId: string): P
 
   const attempts = await prisma.attempt.findMany({ where: { userId: session.user.id, quizId } });
   const synced = await Promise.all(attempts.map((a) => syncExpiry(a.id)));
+  const attemptsAllowed = await getAllowedAttempts(session.user.id, quizId);
 
-  return computeQuizOutcome(synced);
+  return computeQuizOutcome(synced, attemptsAllowed);
 }

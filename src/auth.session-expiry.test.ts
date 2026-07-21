@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { NextRequest } from "next/server";
 import { afterAll, describe, expect, it } from "vitest";
 import { handlers } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -12,7 +13,7 @@ async function createSession(userEmail: string, expires: Date) {
 }
 
 async function fetchSession(sessionToken: string) {
-  const request = new Request("http://localhost/api/auth/session", {
+  const request = new NextRequest("http://localhost/api/auth/session", {
     headers: { cookie: `authjs.session-token=${sessionToken}` },
   });
   const response = await handlers.GET(request);

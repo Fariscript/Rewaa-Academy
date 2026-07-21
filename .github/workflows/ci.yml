@@ -1,0 +1,82 @@
+# CI for the Postgres-backed Vitest suite + Next.js build.
+# The suite runs sequentially against one real database (vitest.config.ts
+# fileParallelism:false) seeded with the fixture rows tests key off, so a
+# single service container is enough. scripts/verify-ai-drafter.ts is
+# deliberately NOT run here — it needs a real ANTHROPIC_API_KEY and writes
+# rows outside the test lifecycle (see CLAUDE.md "Blocked").
+name: CI
+
+# push-only: a pull_request trigger alongside push:["**"] would run every
+# PR-branch commit twice. The concurrency group cancels superseded runs.
+on:
+  push:
+    branches: ["**"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: rewaa
+          POSTGRES_PASSWORD: rewaa
+          POSTGRES_DB: rewaa_academy_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rewaa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: "postgresql://rewaa:rewaa@localhost:5432/rewaa_academy_test?schema=public"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Synthesize .env.test (dummy auth values; a real key is never needed in CI)
+        run: |
+          {
+            echo "DATABASE_URL=\"$DATABASE_URL\""
+            echo "AUTH_SECRET=\"$(node -e 'console.log(require("node:crypto").randomBytes(32).toString("base64"))')\""
+            echo "AUTH_GOOGLE_ID=\"ci-dummy.apps.googleusercontent.com\""
+            echo "AUTH_GOOGLE_SECRET=\"ci-dummy\""
+            echo "ALLOWED_GOOGLE_WORKSPACE_DOMAIN=\"example.com\""
+            echo "ANTHROPIC_API_KEY=\"\""
+            echo "ANTHROPIC_MODEL=\"claude-sonnet-5\""
+            echo "CERTIFICATE_SIGNING_PRIVATE_KEY=\"$(node -e 'const {generateKeyPairSync}=require("node:crypto");const {privateKey}=generateKeyPairSync("ed25519");process.stdout.write(privateKey.export({type:"pkcs8",format:"pem"}).replace(/\n/g,"\\n"))')\""
+          } > .env.test
+          cp .env.test .env
+
+      - name: Prisma generate + migrate + seed
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          npx tsx prisma/seed.ts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
