@@ -1,7 +1,146 @@
 # Handoff — Rewaa Sales Academy (Testing & Assessment Engine)
 
-Last updated: 2026-07-20 (second update, after the slice 9–15 UI/completion
-run; the original snapshot below it is kept as-is where still accurate).
+Last updated: 2026-07-21 (Addendum 5 below; the slices 9–15 update and the
+original snapshot beneath it are kept as-is where still accurate).
+
+## Addendum 5 — main merge verification, parallel-session split, shared files
+
+Note on numbering: no file anywhere in this repo (checked via full-text
+search across `*.md`, including everything the slices 9–15 merge brought
+in) contains the word "Addendum" before this one. If Addenda 1–4 exist,
+they're external to this repo — this section doesn't assume or reference
+their content, only that this is "Addendum 5" per an explicit instruction
+this session. Treat it as self-contained.
+
+### Verified git state (this session, immediately before session end)
+
+Everything below was checked directly against `git` output at time of
+writing, not recalled from earlier in the session — re-run the commands
+yourself if this doc is more than a few days old.
+
+- **`main` — locally and on `origin/main` — is at commit `afd965a`**
+  ("Merge remote-tracking branch 'origin/claude/handoff-project-plan-1e20yo'"),
+  and `origin/main` is byte-identical to local `main` (both resolve to the
+  same SHA). This merge brought in slices 9–15 (trainee + admin UI, CI,
+  README/deployment docs, review-fixes pass, smoke tests) **plus** two
+  commits that arrived on the remote branch after the merge was first
+  scoped: `bf8c6c6` (Slice 16 — question-bank admin UI) and `a83b848`
+  (T-24 — Phase 2 per-trainee reports/trends). Both were merged only after
+  explicit confirmation this session that they were authorized elsewhere
+  (see "Parallel sessions" below) — their own commit messages self-report
+  an "owner directive," which this session could not independently verify
+  beyond noticing the different `Claude-Session` ID.
+- **The "Local demo login for CEO demo" work is NOT on `main` or
+  `origin/main`, in any form.** It exists as three separate commits with
+  identical file content but different hashes (an artifact of being
+  committed from the same dirty working tree onto different branch
+  pointers at different times) — `2d793f7` (branch
+  `claude/handoff-project-plan-1e20yo`), `e3876c3` (branch
+  `local-demo-login`), and `d3c8f6d` (branch `demo-login-latest`, a clean
+  cherry-pick of `e3876c3` onto post-merge `main` — verified: no leftover
+  cherry-pick state, no conflict markers, identical diff content to the
+  original commit, `tsc`/`eslint` clean). Direct proof of absence:
+  `git log main --oneline --grep="demo login" -i` and the same against
+  `origin/main` both return nothing.
+- **A pre-existing commit unrelated to any of this session's work sits on
+  `main`:** `51a8aae "Add initial content to fairs file"`, authored by
+  `FarisAlsaif`, adding a one-line file named `fairs` containing "Salam".
+  Harmless, but flagged again since nothing in this session's history
+  explains it — confirm it was intentional.
+- **Branch protection on `main` is not yet configured**, and the merged
+  remote branch `origin/claude/handoff-project-plan-1e20yo` still exists
+  (points at the same commit as `main`, not yet deleted). Commands for
+  both were drafted this session for review, not run.
+
+### Open business-rule items — current state after the merge
+
+Per `CLAUDE.md`'s "Open items" section (the authoritative list — no
+"Addendum 3" or similar exists in this repo to cross-reference instead).
+None of the six are resolved by the slices 9–15/16 + T-24 merge. Two are
+touched indirectly:
+
+1. **2 failed attempts, consequence** — still fully open. Touched
+   indirectly: slice 10 added `AttemptCapOverride` (Admin can grant +1
+   attempt, audited) and the trainee-facing "both attempts failed" UI
+   state — both are explicit in code comments and copy that they do NOT
+   decide this item, only provide an escape valve / state the fact
+   neutrally.
+2. **Sector reassignment mid-program, progress carryover** — not touched
+   by the merge (searched the full merge diff for sector-reassignment
+   content; only match was an unrelated optimistic-UI fix to the sector
+   picker).
+3. / **3b.** **Lesson-unlock ownership / sequential ordering** — not
+   resolved, but **escalated**: `CLAUDE.md` and `HANDOFF.md` were both
+   updated in the merge to call 3b "now a launch gate" — since the trainee
+   UI exists as of slices 11–13, real trainees getting unordered
+   cross-lesson access is now a live risk, not a theoretical one. **This
+   is the one worth raising with the CEO soonest.**
+4. **Manual grading vs. 95% bar (T-26)** — not resolved. Slice 15 built
+   the grading UI on top of the existing gate, deliberately isolating the
+   binary correct/incorrect input into one component so a future answer
+   only changes that component + `gradeAnswer`. T-24's own commit message
+   independently confirms T-26 "remains blocked on open item #4."
+5. **Notification rules** — not touched at all by the merge.
+6. **FR-26 (Call Library & Evaluation)** — not touched at all by the merge.
+
+(Item #7 — the 95%-unreachable-at-some-question-counts content constraint —
+isn't a business-rule decision per CLAUDE.md's own framing, so not counted
+among the six; unchanged by the merge.)
+
+### Parallel sessions — work is now split
+
+As of 2026-07-21, work on this repo is split across two parallel Claude
+Code sessions, per Faris:
+
+- **This session** (local) — owns the testing/quizzing engine (this
+  file's whole subject) plus statistics/analytics (T-24 and onward).
+- **A separate session** — owns the LMS/content-authoring track. This
+  matches `CLAUDE.md`'s original owner line ("Content management is a
+  separate track (Ibrahim)"), now made concrete as an actual parallel
+  Claude Code session rather than just a future/hypothetical boundary.
+
+The slice 16 and T-24 commits merged today were built by a *third*
+identifiable session (`Claude-Session:
+https://claude.ai/code/session_01MJ9vZFJ4JGwhn2Wd3FMxNn`, co-authored by
+"Claude Fable 5") — worth Faris confirming which of the two ongoing
+tracks (or a third, cloud/web one) that session actually is, since its
+commits self-reported an owner directive this session had no way to
+verify independently.
+
+### Shared files — coordinate before either side edits these
+
+Both tracks read and write the same repo; these are the files where an
+uncoordinated concurrent edit is most likely to silently clobber the
+other side's work (this session hit exactly this failure mode once
+already today, with two sessions both editing `package.json`'s scripts
+block near-simultaneously):
+
+- **`prisma/schema.prisma` and `prisma/migrations/`** — one shared schema
+  file and one ordered migration history for both the content models
+  (Sector/SubSector/Unit/Lesson) and the testing models (Quiz/Question/
+  Attempt/Certificate). Migrations are strictly sequential — concurrent
+  authoring from two sides risks either a numbering collision or a
+  migration history that diverges between the two sessions' local DBs.
+- **`prisma/seed.ts`** — shared fixture data (taxonomy + the two role
+  fixture users) that both tracks' tests key off.
+- **`docs/fr-to-code.md`** — the single FR/T/NFR traceability table both
+  tracks update per their own CLAUDE.md instruction.
+- **`CLAUDE.md` and `HANDOFF.md`** — the two living cross-track docs
+  themselves. Both sessions have already independently edited both files
+  this week.
+- **`src/lib/auth/rbac.ts` and `src/auth.ts`** — the single `requireRole()`
+  gate and NextAuth config. Any content-side permission check should go
+  through the same gate rather than a parallel mechanism.
+- **`src/app/(trainee)/layout.tsx` and `src/app/(admin)/admin/layout.tsx`**
+  — shared UI shells; a content-authoring page would nest under one of
+  these, so changes to shared nav/shell structure affect both tracks'
+  pages.
+- **`.github/workflows/ci.yml`** — one shared CI pipeline.
+- **`.env.example` / `.env`** — one shared env-var manifest; a new
+  content-track var (e.g. video storage credentials) needs to coexist
+  with the testing engine's existing list without collision.
+- **`package.json`** — shared dependency/script manifest — the exact file
+  that already collided once today.
 
 ## Update 2026-07-20: slices 9–15 — the UI/API completion run
 
