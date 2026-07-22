@@ -308,6 +308,10 @@ placeholder home. A second build run closed that:
 - **2026-07-22 (follow-up) — open item #3 (lesson-unlock ownership) gets a
   proposed resolution, NOT marked resolved — awaiting Ibrahim's yes/no.**
   Full proposal (forwardable as-is) is in CLAUDE.md's open item #3.
+- **2026-07-22 (follow-up) — open item #3 (lesson-unlock ownership)
+  RESOLVED, decided by Faris (project owner) directly, not by Ibrahim's
+  confirmation.** The check stays in the testing engine's codebase, as
+  proposed. Full text is in CLAUDE.md's open item #3.
 
 Everything below is the original snapshot.
 
