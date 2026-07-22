@@ -376,16 +376,17 @@ above) is still just a placeholder `Json?` — not confirmed with you, don't
 build against its shape yet.
 
 Migration `prisma/migrations/20260722120000_lesson_content_model` was
-hand-authored (no live Postgres reachable in this session to run `prisma
-migrate dev` against — validated instead via `prisma validate`, `prisma
-generate`, and `tsc --noEmit`, all clean). **Flagging honestly, not
-guessing it's fine: this migration has not been applied to or verified
-against a real database.** Whoever runs it first (CI, or a session with DB
-access) should confirm it applies cleanly before relying on it — same
-"verified vs. assumed" discipline as your own 5b AI-drafter status.
+initially hand-authored (no live Postgres reachable yet at that point in
+the session), then genuinely verified once DB access was sorted out later
+the same session: applied via `prisma migrate deploy` to a completely
+fresh database (all 10 migrations, in order, including the testing
+engine's own `attempt_cap_override` from the same backlog), confirmed
+zero-drift against `prisma/schema.prisma` (`migrate status` →
+"Database schema is up to date"), and the **full existing test suite (36
+files, 171 tests) passes against it, no failures, nothing skipped**. Not
+guessed at — actually run.
 
-No admin or trainee UI built yet — this update is schema-only, same as the
-original handoff scope said it would start as.
+No admin or trainee UI built yet — that's next.
 
 ## Known fragilities
 
