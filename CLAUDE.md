@@ -296,6 +296,131 @@ screenshot/hotspot assets for the content-driven action-simulation grading
 path. Neither is buildable on this side until his content system exists;
 not started here.
 
+## Handoff to testing-engine track (Ibrahim's response, 2026-07-22)
+
+Read this file, HANDOFF.md (including Addendum 5), and `docs/fr-to-code.md`
+in full before responding. Two things addressed directly, per instruction:
+
+**Open item #3 (lesson-unlock ownership) — my answer: yes, confirmed.**
+`isQuizUnlocked`/`markLessonComplete` should stay in the testing engine's
+codebase. Same reasoning your proposal gave: the unlock check only depends
+on a `LessonCompletion(userId, lessonId)` row existing, not on how or where
+it's produced, so it's already decoupled from whatever the content model
+ends up looking like. When FR-11's real "watch video + read text" journey
+lands, "lesson complete" may stop being a manual button and become an
+auto-derived signal (video-watch %, article scroll depth) — but that only
+changes what *writes* the `LessonCompletion` row, not where the *read*
+check lives. I'll treat that write-side contract (the row shape, the
+`(userId, lessonId)` unique key) as something not to break without telling
+you first, same as the shared-files discipline in HANDOFF.md.
+
+One process note, not a substance objection: I found
+`origin/claude/testing-open-item-3-owner-decision` (unmerged, pushed
+today) already contains a commit recording that Faris decided this same
+question directly — "owner decision, not Ibrahim's confirmation." My
+answer above was reached independently (re-read the code fresh, same as
+your proposal asked) and lands on the same resolution, so there's no
+actual conflict to reconcile. Flagging it only because a proposal
+addressed to me got an owner decision before I saw it — worth Faris/you
+knowing that happened, not something I'm asking to relitigate. That branch
+should just merge; nothing here should block it.
+
+**Handoff to Ibrahim's track — content model shape.** Ownership was
+already confirmed (2026-07-22, recorded above). This session is where the
+technical shape design *starts* — nothing is decided yet, so treat
+everything below as direction, not a spec:
+
+- Scope I'm taking on: FR-11 (real lesson journey), FR-12 (Admin content
+  upload/management), FR-18 (taxonomy CUD, currently deferred/read-only on
+  your side), and T-36 (content-level versioning, mirroring your
+  `QuestionRevision` pattern). `Lesson` stays your read dependency
+  (`unitId`, quiz relation) — I'll extend it, not replace its identity.
+- Direction I'm leaning toward, not committed: a versioned content-block
+  model attached to `Lesson` (video/PDF/article/image blocks, ordered),
+  plus a structured asset table for anything a future hotspot simulation
+  would need to reference (image + per-hotspot coordinate/target data) —
+  shaped so your grading-side `Question` fields (rubric, expected action
+  sequence) can point at a stable asset ID instead of duplicating asset
+  data. I have not written a schema. Any real proposal touches
+  `prisma/schema.prisma`, which per this session's standing rule gets a
+  direct check-in with Ibrahim (the human) before it's touched, regardless
+  of which track's work motivates it.
+- Open question back to you, so my shape doesn't miss your actual needs:
+  when you eventually ground AI-drafted questions in real lesson content,
+  what form does the drafter need that content in — full rich text/HTML,
+  a plain-text extract, section-level chunks? And for action-simulation
+  hotspot grounding, do you need anything beyond "an image plus a list of
+  {x, y, label} target regions," or is there DOM/coordinate-system context
+  from how the simulation is captured that the asset model should also
+  carry? Answering either now would shape the schema proposal I bring you;
+  no rush if these aren't decided on your side yet either.
+- Timeline honestly: no ETA committed this response — this is the start of
+  design, not a delivery date. I'll update this section again once a
+  concrete schema proposal exists, same pattern you used for your
+  drafted-not-applied `QuestionType` proposal.
+
+**Update 2026-07-22 (same session) — schema applied, not just proposed.**
+Ibrahim reviewed the direction above and confirmed two design choices (a
+DRAFT/PUBLISHED gate on content items, and per-item rather than per-lesson
+versioning), so `prisma/schema.prisma` now has three new models:
+`ContentItem` (ordered VIDEO/PDF/ARTICLE/IMAGE blocks on `Lesson`),
+`ContentItemRevision` (T-36, same append-only-snapshot shape as your
+`QuestionRevision`), and `ContentAsset` (uploaded binaries — `url` kept
+storage-backend-agnostic; the actual backend, S3/Vercel Blob/local, is
+still undecided by choice, not an oversight). `Lesson`'s identity/read
+surface for your track is untouched — only a new `contentItems` relation
+was added, nothing existing renamed or removed. `ContentAsset.hotspots`
+(the provisional `{id, x, y, width, height, label}` shape from my question
+above) is still just a placeholder `Json?` — not confirmed with you, don't
+build against its shape yet.
+
+Migration `prisma/migrations/20260722120000_lesson_content_model` was
+initially hand-authored (no live Postgres reachable yet at that point in
+the session), then genuinely verified once DB access was sorted out later
+the same session: applied via `prisma migrate deploy` to a completely
+fresh database (all 10 migrations, in order, including the testing
+engine's own `attempt_cap_override` from the same backlog), confirmed
+zero-drift against `prisma/schema.prisma` (`migrate status` →
+"Database schema is up to date"), and the **full existing test suite (36
+files, 171 tests) passes against it, no failures, nothing skipped**. Not
+guessed at — actually run.
+
+No admin or trainee UI built yet — that's next.
+
+**Update 2026-07-22 (same session) — admin content-management UI shipped
+(FR-12).** `/admin/content` (taxonomy tree → lesson → content items) now
+supports create/edit/publish/unpublish/reorder for VIDEO/PDF/ARTICLE/IMAGE
+items, plus revision history + restore (T-36) — full CRUD on top of the
+schema above, on branch `claude/lms-content-admin-ui` (stacked on this
+branch, not yet merged to `main`). VIDEO/PDF/IMAGE items upload to local
+disk (`src/lib/content/upload-asset.ts`) — still explicitly dev-only, the
+real storage backend is still your open question to answer, not decided
+here. 34 new tests; full suite 40 files/205 tests passing.
+
+Manually verified end-to-end in a real browser (forged an admin session —
+no OAuth creds available locally): create → publish → edit → revision
+history → restore, walked live, not just unit-tested. That walkthrough
+found a real bug (fixed): restoring a revision updated the database
+correctly but the edit form kept showing the pre-restore content until a
+hard reload, since `router.refresh()` re-renders server data without
+remounting an already-initialized client component's local state — a
+follow-up save without noticing would have silently re-clobbered the
+restore. Fixed by keying the form on the item's `updatedAt`.
+
+**One finding worth flagging to your track specifically, not just a note
+to self:** uploaded `ContentAsset` URLs (`/uploads/content-assets/...`) are
+gated by the app's auth middleware — any authenticated session can fetch
+one, the same as every other route — but they are **not sector-scoped**.
+A trainee assigned to one sector could fetch another sector's asset URL
+directly if they knew (or guessed) its id. This has an exact precedent
+already in the codebase (certificate PDFs and their public verify link
+aren't sector-gated either), so it's not a new category of gap, but it's
+worth deciding deliberately rather than inheriting silently — especially
+since your track's action-simulation hotspot grounding would reference
+these same assets. Not fixed here: FR-11's trainee-facing content view
+doesn't exist yet, so nothing actually serves these URLs to a trainee
+today; revisit when it does.
+
 ## Known fragilities
 
 Not CEO decisions — internal engineering caveats worth grepping for before

@@ -1,4 +1,11 @@
-import type { QuestionSource, QuestionStatus, QuestionType, SkillType } from "@/generated/prisma/client";
+import type {
+  ContentItemStatus,
+  ContentItemType,
+  QuestionSource,
+  QuestionStatus,
+  QuestionType,
+  SkillType,
+} from "@/generated/prisma/client";
 import type { QuizOutcomeStatus } from "@/lib/quiz/outcome";
 
 // NFR-09: Arabic-only UI with consistent terminology — every surface maps
@@ -39,4 +46,16 @@ export const QUESTION_STATUS_LABELS: Record<QuestionStatus, string> = {
 export const QUESTION_SOURCE_LABELS: Record<QuestionSource, string> = {
   MANUAL: "إدخال يدوي",
   AI_DRAFT: "مسودة ذكاء اصطناعي",
+};
+
+export const CONTENT_ITEM_TYPE_LABELS: Record<ContentItemType, string> = {
+  VIDEO: "فيديو",
+  PDF: "ملف PDF",
+  ARTICLE: "مقال نصي",
+  IMAGE: "صورة",
+};
+
+export const CONTENT_ITEM_STATUS_LABELS: Record<ContentItemStatus, string> = {
+  DRAFT: "مسودة",
+  PUBLISHED: "منشور",
 };
