@@ -298,13 +298,14 @@ session is stating as open questions, not deciding on his behalf:
 - **Content grounding is currently zero.** Verified directly this session:
   the AI question-drafting prompt (`src/lib/ai/drafter.ts`,
   `DraftPromptInput`) only ever receives `lessonTitle`, `unitName`, and
-  `skillType` — never any lesson content itself. That's not a drafting-code
-  gap; the `Lesson` model in `prisma/schema.prisma` has no content field at
-  all (`id`, `title`, `unitId` — nothing else), confirming FR-12's existing
-  note that `Lesson` is a title-only placeholder pending his content
-  system. Every AI-drafted question today is generated from a title
-  string, not real lesson material, because there's no real lesson
-  material to ground it in yet.
+  `skillType` — never any lesson content itself. **Stale as of 2026-07-22,
+  corrected here — the `Lesson`-is-title-only-placeholder claim this
+  sentence made no longer holds**: see "Handoff to testing-engine track"
+  below, `Lesson` now has real `contentItems` (ARTICLE items carry actual
+  body text), migration applied. Every AI-drafted question today is still
+  generated from a title string, not real lesson material — not because
+  none exists anymore, but because the drafter code hasn't been updated to
+  read it yet.
 - **Action-simulation makes this more acute, not just more of the same.**
   A content-driven hotspot simulation (trainee clicks through a sequence
   against a captured UI) needs structured access to lesson screenshots or
