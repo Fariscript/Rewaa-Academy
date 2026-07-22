@@ -9,6 +9,11 @@ import { computeQuizOutcome, type QuizOutcome } from "@/lib/quiz/outcome";
 export interface QuizDashboardRow extends QuizOutcome {
   trainee: { id: string; name: string | null; email: string };
   onAttempt2: boolean;
+  // Open item #1 (RESOLVED 2026-07-22, see CLAUDE.md): permanent record —
+  // deliberately NOT collapsed with `status`/`failedBothAttempts` below,
+  // which are point-in-time and flip back once the trainee breaks out of
+  // the redo-loop. This stays true forever once set, even after PASSED.
+  everFailed: boolean;
 }
 
 export interface QuizDashboard {
@@ -21,7 +26,11 @@ export interface QuizDashboard {
     inProgress: number;
     awaitingManualGrade: number;
     passed: number;
+    // Point-in-time: currently FAILED_FINAL_ATTEMPT, right now. Clears the
+    // moment a trainee redoes the lesson and gets a fresh window (open
+    // item #1) — distinct from `everFailed` below, which never clears.
     failedBothAttempts: number;
+    everFailed: number;
     onAttempt2: number;
     averageScore: number | null;
   };
@@ -69,12 +78,21 @@ export async function getQuizDashboard(session: Session | null, quizId: string):
   });
   const extraByUserId = new Map(overrides.map((o) => [o.userId, o._sum.extraAttempts ?? 0]));
 
+  // Batched, same discipline as the attempts/overrides reads above: one
+  // query for the whole cohort's permanent failure records.
+  const failureRecords = await prisma.quizFailureRecord.findMany({
+    where: { quizId, userId: { in: traineeIds } },
+    select: { userId: true },
+  });
+  const everFailedUserIds = new Set(failureRecords.map((r) => r.userId));
+
   const rows: QuizDashboardRow[] = trainees.map((trainee) => {
     const synced = attempts.filter((a) => a.userId === trainee.id).map((a) => syncedById.get(a.id) ?? a);
     const attemptsAllowed = DEFAULT_MAX_ATTEMPTS + (extraByUserId.get(trainee.id) ?? 0);
     const outcome = computeQuizOutcome(synced, attemptsAllowed);
     const onAttempt2 = synced.some((a) => a.attemptNumber === 2);
-    return { trainee, onAttempt2, ...outcome };
+    const everFailed = everFailedUserIds.has(trainee.id);
+    return { trainee, onAttempt2, everFailed, ...outcome };
   });
 
   const scored = rows.filter((r) => r.bestScore !== null);
@@ -92,6 +110,7 @@ export async function getQuizDashboard(session: Session | null, quizId: string):
       awaitingManualGrade: rows.filter((r) => r.status === "AWAITING_MANUAL_GRADE").length,
       passed: rows.filter((r) => r.status === "PASSED").length,
       failedBothAttempts: rows.filter((r) => r.status === "FAILED_FINAL_ATTEMPT").length,
+      everFailed: rows.filter((r) => r.everFailed).length,
       onAttempt2: rows.filter((r) => r.onAttempt2).length,
       averageScore,
     },

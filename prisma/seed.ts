@@ -6,6 +6,15 @@ import { prisma } from "../src/lib/prisma";
 const FIXTURE_USERS = [
   { email: "trainee@example.com", name: "Trainee Fixture", role: "TRAINEE" as const },
   { email: "admin@example.com", name: "Admin Fixture", role: "ADMIN" as const },
+  // Open item #1 (RESOLVED 2026-07-22, see CLAUDE.md): the redo-loop's
+  // automatic fresh-attempt grants reuse AttemptCapOverride, whose
+  // grantedById is a required FK to a real User — this is the account
+  // those automatic grants are attributed to (never an admin's own id),
+  // so the audit trail can always distinguish "an Admin granted this" from
+  // "the redo-loop granted this automatically". Chosen over a nullable
+  // grantedById or a source-discriminator column specifically to avoid a
+  // schema change for this — see src/lib/admin/attempt-override.ts.
+  { email: "system-redo-loop@rewaa-internal.local", name: "النظام (منح تلقائي)", role: "ADMIN" as const },
 ];
 
 // Stub taxonomy fixture — NOT the authoritative sector/sub-sector list (that
