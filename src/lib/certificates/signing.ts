@@ -1,44 +1,22 @@
 import { createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
+import {
+  CertificateSigningKeyConfigError,
+  normalizeAndValidateCertificateSigningKeyFormat,
+} from "./signing-config";
 
-const PEM_HEADER = "-----BEGIN PRIVATE KEY-----";
-const PEM_FOOTER = "-----END PRIVATE KEY-----";
-
-export class CertificateSigningKeyConfigError extends Error {
-  constructor(message: string, options?: { cause?: unknown }) {
-    super(message, options);
-    this.name = "CertificateSigningKeyConfigError";
-  }
-}
+export { CertificateSigningKeyConfigError };
 
 // Validates + parses CERTIFICATE_SIGNING_PRIVATE_KEY, replacing node:crypto's
-// raw OpenSSL decoder error with a message that names the actual cause. The
-// most common one: pasting the multi-line PEM straight from
-// `privateKey.export(...)` into .env instead of the single-line \n-escaped,
-// quoted format — dotenv/@next/env parse .env line-by-line, so a raw
-// multi-line paste silently truncates to just the "-----BEGIN..." line.
-// Exported so it can also run eagerly at server startup (see
-// src/instrumentation.ts) instead of only failing lazily on first
-// certificate issuance/verification.
+// raw OpenSSL decoder error with a message that names the actual cause.
+// Format validation (unset, missing PEM markers) lives in signing-config.ts,
+// which deliberately has no node:crypto import — see that file for why
+// (instrumentation.ts needs to run it without pulling node:crypto into the
+// /instrumentation webpack bundle). This function adds the cryptographic
+// parse on top, for callers that need the actual key object.
 export function loadCertificateSigningKey(
   rawEnvValue: string | undefined = process.env.CERTIFICATE_SIGNING_PRIVATE_KEY,
 ) {
-  if (!rawEnvValue || rawEnvValue.trim() === "") {
-    throw new CertificateSigningKeyConfigError(
-      "CERTIFICATE_SIGNING_PRIVATE_KEY is not set. Generate one with the command documented in " +
-        ".env.example (Certificate digital signature section) and paste the entire printed line into .env.",
-    );
-  }
-
-  const normalized = rawEnvValue.replace(/\\n/g, "\n");
-
-  if (!normalized.includes(PEM_HEADER) || !normalized.includes(PEM_FOOTER)) {
-    throw new CertificateSigningKeyConfigError(
-      "CERTIFICATE_SIGNING_PRIVATE_KEY is missing its PEM BEGIN/END markers. This almost always means " +
-        "the multi-line PEM output was pasted directly into .env instead of the single-line, \\n-escaped, " +
-        "quoted format — dotenv truncates a raw multi-line paste to just the first line. Re-generate " +
-        "using the command in .env.example, which prints a ready-to-paste single line.",
-    );
-  }
+  const normalized = normalizeAndValidateCertificateSigningKeyFormat(rawEnvValue);
 
   try {
     return createPrivateKey(normalized);
