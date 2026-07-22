@@ -312,6 +312,24 @@ placeholder home. A second build run closed that:
   RESOLVED, decided by Faris (project owner) directly, not by Ibrahim's
   confirmation.** The check stays in the testing engine's codebase, as
   proposed. Full text is in CLAUDE.md's open item #3.
+- **2026-07-22 — open items #1 and #3b RESOLVED together, decided by Faris
+  (project owner) directly.** A trainee who fails both attempts is
+  dashboard-flagged and blocked from advancing to the next lesson in the
+  same chapter/topic chain until they redo the failed lesson and pass in a
+  fresh 2-attempt window, repeating until they pass — scoped to that chain
+  only (an unrelated chain is unaffected). This is the chain-scoped
+  sequential ordering 3b asked about — neither single-lesson-only nor
+  whole-sector-ordered. **Implementation not started**: investigated (not
+  guessed) how "chapter/topic chain" maps onto the content hierarchy and
+  how a fresh attempt window would interact with the existing cap model,
+  findings + a design proposal held for Faris's review — two questions
+  (gated-only vs. platform-wide; whether the dashboard flag persists past
+  a later pass) still need his confirmation before the attempt-lifecycle
+  work starts. Item #5 (notifications) is now explicitly ON HOLD, not
+  pending an answer — the owner's words: "not crucial for the platform to
+  work right now." Item #6 (FR-26) is now OUT OF SCOPE for this track,
+  assigned to Ibrahim's by the owner — see CLAUDE.md's "Handoff to
+  Ibrahim's track" section. Full text for all four is in CLAUDE.md.
 
 Everything below is the original snapshot.
 

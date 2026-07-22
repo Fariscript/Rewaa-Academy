@@ -94,8 +94,35 @@ roleplay (T-30), deeper dashboard analytics (T-24).
 
 ## Open items — STOP and ask if a task touches one of these
 
-1. What happens after 2 failed attempts — blocked, flagged for manual
-   review, or something else?
+1. **RESOLVED 2026-07-22 — the owner's decision, recorded here verbatim.
+   This also resolves 3b below** (the sequential-ordering launch gate):
+   the rule is neither "single lesson only" nor "strict order across the
+   entire sector" — it's **chapter/topic-chain-scoped sequential
+   ordering**.
+
+   A trainee who fails both attempts on a quiz is flagged in the admin
+   dashboard statistics as failed. They cannot advance to the next lesson
+   in the same chapter/topic chain until they redo the failed lesson and
+   pass within a fresh 2-attempt window — this repeats indefinitely ("stay
+   in loop until they break out") until they pass. The lock is scoped to
+   the specific chapter/topic chain only: failing a call-skills lesson
+   blocks advancement within that chain, but does not affect or block
+   progress in an unrelated chain (the owner's example: a Zoho CRM
+   lesson). Finishing a lesson already unlocks its own quiz (item #3,
+   already built) — passing that quiz is what gates advancement to the
+   next lesson in the same chain; the existing single-lesson unlock check
+   itself doesn't change.
+
+   **Implementation is NOT started.** This session investigated (not
+   guessed) the sub-questions this decision raises — where "chapter/topic
+   chain" maps onto the existing content hierarchy, how a fresh attempt
+   window interacts with the existing hard-cap-plus-override model, and
+   more — and reported findings plus a design proposal directly for
+   review. Two questions are explicitly unconfirmed and block the core
+   attempt-lifecycle work: whether the loop mechanic applies only to
+   advancement-gating quizzes or platform-wide, and whether the dashboard
+   "failed" flag persists after a later pass or clears. Do not build the
+   redo-loop/attempt-reset mechanic until those are answered.
 2. **RESOLVED 2026-07-22 — the CEO's decision, recorded here verbatim:**
    - Reassignment to a new sector starts that sector's quizzes at zero.
      Confirmed already-automatic, no new code needed: quizzes in different
@@ -188,11 +215,12 @@ roleplay (T-30), deeper dashboard analytics (T-24).
 
    No code changes were needed either way — this was a documentation
    decision only.
-3b. T-9 ("prior required content/quizzes are complete") may mean sequential
-    ordering across a sector's whole lesson sequence, not just single-lesson
-    unlock. Needs confirming with the CEO before Phase 1 launch — retrofitting
-    order-enforcement after trainees already have unordered access is
-    expensive to unwind.
+3b. **RESOLVED 2026-07-22 — folded into item #1 above**, which records the
+    actual rule (chapter/topic-chain-scoped sequential ordering — neither
+    single-lesson-only nor whole-sector-ordered). Kept as its own entry
+    only so the existing `TODO(open-item-3, open-item-3b)` reference
+    (`src/lib/content/quiz-unlock.ts`) still resolves to something; no
+    separate text to add here.
 4. **RESOLVED 2026-07-22 — the CEO's direction, recorded here verbatim:**
    there is no manual grading. Every non-auto-graded item is graded
    automatically, routed by type:
@@ -221,9 +249,17 @@ roleplay (T-30), deeper dashboard analytics (T-24).
    engine until those are answered. See also "Handoff to Ibrahim's track"
    below — this decision creates new dependencies on the content system
    that need his track's input, not a guess from this one.
-5. Notification rules (triggers, channels, wording) — not yet defined.
-6. FR-26 (Call Library & Evaluation) — flagged for a change in the latest
-   meeting, but no detail was captured yet.
+5. **ON HOLD 2026-07-22 — deliberately deferred, not pending an answer.**
+   Notification rules (triggers, channels, wording). The owner's words:
+   "not crucial for the platform to work right now." Distinct from every
+   other item in this list: this isn't waiting on a decision, it's been
+   explicitly deprioritized. Revisit only if the owner raises it again.
+6. **OUT OF SCOPE for this track, 2026-07-22 — assigned to Ibrahim's
+   track/session by the owner.** FR-26 (Call Library & Evaluation) was
+   flagged for a change in an earlier meeting with no detail captured;
+   the owner has since assigned it to Ibrahim's track. See "Handoff to
+   Ibrahim's track" below — no longer carried as an open item on this
+   track.
 7. 95% passing grade is only reachable at question counts where it lands on
    a whole number (e.g. 20 questions → 19/20 = 95%). A quiz authored with a
    count where 95% falls between two integer results (e.g. 10 questions:
@@ -295,6 +331,25 @@ session's earlier content-grounding finding, above), and (2) sourcing
 screenshot/hotspot assets for the content-driven action-simulation grading
 path. Neither is buildable on this side until his content system exists;
 not started here.
+
+**Update 2026-07-22 — FR-26 (Call Library & Evaluation) assigned here by
+the owner.** Previously open item #6 on this track; no longer is (see
+Open items above). No detail on scope/requirements has been captured yet
+— this is a pointer, not a spec.
+
+**Update 2026-07-22 — item #1's chapter/topic-chain resolution touches his
+content model too, flagged not guessed at:** this session's investigation
+(held for Faris's review, not yet actioned) found `Unit` is the closest
+existing match for "chapter/topic chain" — corroborated by FR-09's own
+language ("subcategories: First Call, ...") and the seed fixture's exact
+naming match — but FR-09 itself says the real path/subcategory structure
+belongs to his content system, and `Lesson` has no explicit ordering field
+today (only implicit `createdAt`, and every seeded `Unit` currently holds
+exactly one lesson, so real multi-lesson sequencing has never been
+exercised). If his content system's real hierarchy ends up shaped
+differently than today's collapsed `Unit` stand-in, or needs an explicit
+lesson-order field, that's a coordination point between the two tracks
+when this gets built — not decided or acted on here.
 
 ## Known fragilities
 
