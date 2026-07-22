@@ -14,6 +14,14 @@
  * first thing expected to hurt as the cohort grows; the trainee home is
  * batched and should stay flat. Recorded in HANDOFF.md — re-run after
  * anything touches src/lib/dashboard/ or src/lib/content/trainee-progress.
+ *
+ * The T-24 (Phase 2) additions — getQuizTrends and getTraineeReport — have
+ * no dedicated API route (RSC pages call the lib functions directly), so
+ * they're measured here via the actual admin pages that render them:
+ * /admin/quizzes/[id] (dashboard + trends together) and
+ * /admin/trainees/[id] (per-trainee report). Add T-24 coverage here
+ * whenever it changes; the original dashboard-only run predates T-24
+ * entirely and never exercised these paths.
  */
 import { randomBytes, randomUUID } from "node:crypto";
 import { Client } from "pg";
@@ -52,8 +60,10 @@ async function main() {
   console.log(`Seeding throwaway cohort: ${COHORT} trainees × 2 finalized attempts on quiz ${quizId} ...`);
   const userValues: string[] = [];
   const attemptValues: string[] = [];
+  let reportTraineeId: string | undefined;
   for (let i = 0; i < COHORT; i++) {
     const uid = `perf-u-${i}-${randomUUID().slice(0, 8)}`;
+    if (i === 0) reportTraineeId = uid;
     userValues.push(`('${uid}', 'perf-${i}@example.com', 'متدرب أداء ${i}', 'TRAINEE', '${sectorId}', now(), now())`);
     for (let n = 1; n <= 2; n++) {
       const aid = `perf-a-${i}-${n}-${randomUUID().slice(0, 8)}`;
@@ -98,6 +108,8 @@ async function main() {
     await expectOk(`/api/admin/quizzes`, adminCookie);
     await expectOk(`/api/content`, traineeCookie);
     await expectOk(`/`, traineeCookie);
+    await expectOk(`/admin/quizzes/${quizId}`, adminCookie);
+    await expectOk(`/admin/trainees/${reportTraineeId}`, adminCookie);
 
     console.log(`\nCohort on dashboard quiz: ${COHORT + 1} trainees (${COHORT * 2} finalized attempts)\n`);
     await median(`admin dashboard (per-quiz, ${COHORT + 1} trainees)`, 5, () =>
@@ -106,6 +118,10 @@ async function main() {
     await median("admin quiz catalog", 5, () => expectOk("/api/admin/quizzes", adminCookie));
     await median("trainee content API (batched sector read)", 5, () => expectOk("/api/content", traineeCookie));
     await median("trainee home page (SSR sector tree)", 5, () => expectOk("/", traineeCookie));
+    await median(`admin quiz page — dashboard+trends SSR (T-24, ${COHORT + 1} trainees)`, 5, () =>
+      expectOk(`/admin/quizzes/${quizId}`, adminCookie),
+    );
+    await median("admin trainee report SSR (T-24)", 5, () => expectOk(`/admin/trainees/${reportTraineeId}`, adminCookie));
   } finally {
     console.log("\nCleaning throwaway rows ...");
     await db.query(`DELETE FROM attempts WHERE id LIKE 'perf-a-%'`);
