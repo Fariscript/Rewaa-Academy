@@ -94,8 +94,49 @@ roleplay (T-30), deeper dashboard analytics (T-24).
 
 ## Open items — STOP and ask if a task touches one of these
 
-1. What happens after 2 failed attempts — blocked, flagged for manual
-   review, or something else?
+1. **RESOLVED 2026-07-22 — the owner's decision, recorded here verbatim.
+   This also resolves 3b below** (the sequential-ordering launch gate):
+   the rule is neither "single lesson only" nor "strict order across the
+   entire sector" — it's **chapter/topic-chain-scoped sequential
+   ordering**.
+
+   A trainee who fails both attempts on a quiz is flagged in the admin
+   dashboard statistics as failed. They cannot advance to the next lesson
+   in the same chapter/topic chain until they redo the failed lesson and
+   pass within a fresh 2-attempt window — this repeats indefinitely ("stay
+   in loop until they break out") until they pass. The lock is scoped to
+   the specific chapter/topic chain only: failing a call-skills lesson
+   blocks advancement within that chain, but does not affect or block
+   progress in an unrelated chain (the owner's example: a Zoho CRM
+   lesson). Finishing a lesson already unlocks its own quiz (item #3,
+   already built) — passing that quiz is what gates advancement to the
+   next lesson in the same chain; the existing single-lesson unlock check
+   itself doesn't change.
+
+   **Both implementation sub-questions are now answered by the owner,
+   recorded verbatim:**
+   - **Scope: platform-wide, not gated-only.** The redo-loop applies to
+     every quiz — there is no gated-only vs. platform-wide split. To
+     complete a lesson, its quiz must be passed under the redo-loop model.
+     This replaces the old hard-cap-plus-override behavior everywhere, not
+     just at chain-ending or advancement-gating quizzes.
+   - **The dashboard must record two permanent facts, not a point-in-time
+     status:** (a) whether the trainee ever failed both attempts on a
+     given quiz, at least once, regardless of later outcome, and (b)
+     whether they eventually passed or not. This is the *bigger* of the
+     two options this session's investigation flagged — the existing
+     `FAILED_FINAL_ATTEMPT`/`failedBothAttempts` status is point-in-time
+     only and would lose the "ever failed" fact once a trainee passes, so
+     it does not satisfy this on its own; a new persistent field is
+     needed. A schema proposal for it was drafted and shared for
+     review — **not applied**, per the standing rule to stop before
+     touching `prisma/schema.prisma`.
+
+   Implementation (`markLessonComplete`'s redo-detection/fresh-attempt
+   grant, `quiz-unlock.ts`'s chain-ordering check, the automatic
+   attempt-grant mechanism) is in progress this session, gated on the
+   schema proposal above being confirmed before it's applied — see
+   `HANDOFF.md` for status.
 2. **RESOLVED 2026-07-22 — the CEO's decision, recorded here verbatim:**
    - Reassignment to a new sector starts that sector's quizzes at zero.
      Confirmed already-automatic, no new code needed: quizzes in different
@@ -188,11 +229,12 @@ roleplay (T-30), deeper dashboard analytics (T-24).
 
    No code changes were needed either way — this was a documentation
    decision only.
-3b. T-9 ("prior required content/quizzes are complete") may mean sequential
-    ordering across a sector's whole lesson sequence, not just single-lesson
-    unlock. Needs confirming with the CEO before Phase 1 launch — retrofitting
-    order-enforcement after trainees already have unordered access is
-    expensive to unwind.
+3b. **RESOLVED 2026-07-22 — folded into item #1 above**, which records the
+    actual rule (chapter/topic-chain-scoped sequential ordering — neither
+    single-lesson-only nor whole-sector-ordered). Kept as its own entry
+    only so the existing `TODO(open-item-3, open-item-3b)` reference
+    (`src/lib/content/quiz-unlock.ts`) still resolves to something; no
+    separate text to add here.
 4. **RESOLVED 2026-07-22 — the CEO's direction, recorded here verbatim:**
    there is no manual grading. Every non-auto-graded item is graded
    automatically, routed by type:
@@ -221,9 +263,17 @@ roleplay (T-30), deeper dashboard analytics (T-24).
    engine until those are answered. See also "Handoff to Ibrahim's track"
    below — this decision creates new dependencies on the content system
    that need his track's input, not a guess from this one.
-5. Notification rules (triggers, channels, wording) — not yet defined.
-6. FR-26 (Call Library & Evaluation) — flagged for a change in the latest
-   meeting, but no detail was captured yet.
+5. **ON HOLD 2026-07-22 — deliberately deferred, not pending an answer.**
+   Notification rules (triggers, channels, wording). The owner's words:
+   "not crucial for the platform to work right now." Distinct from every
+   other item in this list: this isn't waiting on a decision, it's been
+   explicitly deprioritized. Revisit only if the owner raises it again.
+6. **OUT OF SCOPE for this track, 2026-07-22 — assigned to Ibrahim's
+   track/session by the owner.** FR-26 (Call Library & Evaluation) was
+   flagged for a change in an earlier meeting with no detail captured;
+   the owner has since assigned it to Ibrahim's track. See "Handoff to
+   Ibrahim's track" below — no longer carried as an open item on this
+   track.
 7. 95% passing grade is only reachable at question counts where it lands on
    a whole number (e.g. 20 questions → 19/20 = 95%). A quiz authored with a
    count where 95% falls between two integer results (e.g. 10 questions:
@@ -248,13 +298,14 @@ session is stating as open questions, not deciding on his behalf:
 - **Content grounding is currently zero.** Verified directly this session:
   the AI question-drafting prompt (`src/lib/ai/drafter.ts`,
   `DraftPromptInput`) only ever receives `lessonTitle`, `unitName`, and
-  `skillType` — never any lesson content itself. That's not a drafting-code
-  gap; the `Lesson` model in `prisma/schema.prisma` has no content field at
-  all (`id`, `title`, `unitId` — nothing else), confirming FR-12's existing
-  note that `Lesson` is a title-only placeholder pending his content
-  system. Every AI-drafted question today is generated from a title
-  string, not real lesson material, because there's no real lesson
-  material to ground it in yet.
+  `skillType` — never any lesson content itself. **Stale as of 2026-07-22,
+  corrected here — the `Lesson`-is-title-only-placeholder claim this
+  sentence made no longer holds**: see "Handoff to testing-engine track"
+  below, `Lesson` now has real `contentItems` (ARTICLE items carry actual
+  body text), migration applied. Every AI-drafted question today is still
+  generated from a title string, not real lesson material — not because
+  none exists anymore, but because the drafter code hasn't been updated to
+  read it yet.
 - **Action-simulation makes this more acute, not just more of the same.**
   A content-driven hotspot simulation (trainee clicks through a sequence
   against a captured UI) needs structured access to lesson screenshots or
@@ -295,6 +346,30 @@ session's earlier content-grounding finding, above), and (2) sourcing
 screenshot/hotspot assets for the content-driven action-simulation grading
 path. Neither is buildable on this side until his content system exists;
 not started here.
+
+**Update 2026-07-22 — FR-26 (Call Library & Evaluation) assigned here by
+the owner.** Previously open item #6 on this track; no longer is (see
+Open items above). No detail on scope/requirements has been captured yet
+— this is a pointer, not a spec.
+
+**Update 2026-07-22 — item #1's chapter/topic-chain resolution touches his
+content model too, flagged not guessed at:** this session's investigation
+(held for Faris's review, not yet actioned) found `Unit` is the closest
+existing match for "chapter/topic chain" — corroborated by FR-09's own
+language ("subcategories: First Call, ...") and the seed fixture's exact
+naming match — but FR-09 itself says the real path/subcategory structure
+belongs to his content system, and `Lesson` has no explicit ordering field
+today (only implicit `createdAt`, and every seeded `Unit` currently holds
+exactly one lesson, so real multi-lesson sequencing has never been
+exercised). If his content system's real hierarchy ends up shaped
+differently than today's collapsed `Unit` stand-in, or needs an explicit
+lesson-order field, that's a coordination point between the two tracks
+when this gets built — not decided or acted on here. **Update, same
+day — since resolved by Ibrahim's own response below**: the redo-loop and
+chain-ordering unlock check have since been implemented using `Unit` +
+`createdAt` ordering exactly as flagged here, unblocked by the ownership
+answer he gave; still flagged as a stand-in pending a real ordering field,
+per his own note on the content-model shape below.
 
 ## Handoff to testing-engine track (Ibrahim's response, 2026-07-22)
 
