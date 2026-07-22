@@ -1,6 +1,32 @@
 import { prisma } from "@/lib/prisma";
 import { scoreAnswers } from "./scoring";
 import { isAutoGraded } from "@/lib/questions/question-types";
+import { ForbiddenError, NotFoundError } from "@/lib/errors";
+
+// Open item #2 (RESOLVED 2026-07-22, see CLAUDE.md): progress in a sector a
+// trainee is no longer assigned to is never deleted, but stays inaccessible
+// until they're reassigned back. getQuizOutcome (src/lib/quiz/outcome.ts)
+// already makes reads sector-scoped this way; this is the same check
+// factored out for callers that mutate an attempt directly (save/submit)
+// rather than going through an outcome read. Attempt rows themselves are
+// never sector-filtered at the query level (see start-attempt.ts) — cap
+// consumption and history are restored automatically, in full, once the
+// sector matches again, purely because nothing here ever deletes them.
+export async function assertTraineeSectorMatchesQuiz(userId: string, quizId: string) {
+  const quiz = await prisma.quiz.findUnique({
+    where: { id: quizId },
+    select: { lesson: { select: { unit: { select: { subSector: { select: { sectorId: true } } } } } } },
+  });
+  if (!quiz) throw new NotFoundError("Quiz not found");
+
+  const trainee = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { sectorId: true },
+  });
+  if (!trainee.sectorId || trainee.sectorId !== quiz.lesson.unit.subSector.sectorId) {
+    throw new ForbiddenError("Quiz is outside your assigned sector");
+  }
+}
 
 // TODO(ownership-audit-1): this function trusts attemptId unconditionally —
 // it has no session/ownership check of its own. Every current call site

@@ -2,7 +2,7 @@ import type { Session } from "next-auth";
 import type { Attempt, AttemptAnswer, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, NotFoundError, UnauthenticatedError } from "@/lib/errors";
-import { syncExpiry } from "./attempt-lifecycle";
+import { assertTraineeSectorMatchesQuiz, syncExpiry } from "./attempt-lifecycle";
 import { getQuizOutcome, type QuizOutcome } from "./outcome";
 
 // The ONLY shape of an attempt that may reach a trainee — as a route's JSON
@@ -125,18 +125,23 @@ export async function getQuizResultForTrainee(session: Session | null, quizId: s
 
 // Read view of one attempt for its owner — what the quiz-taking screen
 // renders and how an in-progress attempt is resumed after a refresh.
-// Ownership is verified BEFORE syncExpiry: syncExpiry/finalizeAttempt trust
-// attemptId unconditionally (TODO(ownership-audit-1) in
-// attempt-lifecycle.ts), so every route-reachable caller must pre-verify —
-// this function is the precedent. Reading also lazily finalizes an expired
-// attempt (T-32), same as every other access path. Trainee self-read — no
-// audit entry.
+// Ownership AND current-sector access are verified BEFORE syncExpiry:
+// syncExpiry/finalizeAttempt trust attemptId unconditionally
+// (TODO(ownership-audit-1) in attempt-lifecycle.ts), so every
+// route-reachable caller must pre-verify — this function is the precedent.
+// The sector check (open item #2, resolved — see CLAUDE.md) was previously
+// only enforced implicitly, as a side effect of the getQuizOutcome call
+// below; it's explicit and first here now so a reassigned-away trainee's
+// stale attempt is never even lazily expiry-synced on their behalf.
+// Reading also lazily finalizes an expired attempt (T-32), same as every
+// other access path. Trainee self-read — no audit entry.
 export async function getAttemptForTrainee(session: Session | null, attemptId: string): Promise<TraineeAttemptView> {
   if (!session?.user) throw new UnauthenticatedError();
 
   const attempt = await prisma.attempt.findUnique({ where: { id: attemptId } });
   if (!attempt) throw new NotFoundError("Attempt not found");
   if (attempt.userId !== session.user.id) throw new ForbiddenError();
+  await assertTraineeSectorMatchesQuiz(session.user.id, attempt.quizId);
 
   await syncExpiry(attemptId);
 
