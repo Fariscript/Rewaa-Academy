@@ -251,6 +251,19 @@ placeholder home. A second build run closed that:
   one override aggregate — commit history has the change), quiz catalog
   ~28ms, trainee content API ~27ms, home SSR ~150ms. Re-run the script
   after touching `src/lib/dashboard/` or `trainee-progress.ts`.
+- **Perf sanity re-run, 2026-07-21, extended for T-24:** the 2026-07-20 run
+  above predates T-24 and never touched `getQuizTrends`/`getTraineeReport` —
+  there's no dedicated API route for either (their only caller is an RSC
+  page), so `scripts/perf-sanity.ts` silently never exercised them. Added
+  two measured paths hitting the actual pages that call them
+  (`/admin/quizzes/[id]` — dashboard + trends together — and
+  `/admin/trainees/[id]`) and re-ran the same 301-trainee/600-attempt
+  cohort: per-quiz admin dashboard API ~55ms, quiz catalog ~53ms, trainee
+  content API ~61ms, home SSR ~60ms, **admin quiz page (dashboard+trends
+  SSR) ~59ms**, **admin trainee report SSR ~52ms**. Both new T-24 paths
+  land in the same range as the already-batched ones — no scaling problem
+  found. Re-run after touching `src/lib/dashboard/`, `trainee-progress.ts`,
+  `quiz-trends.ts`, or `trainee-report.ts`.
 
 Everything below is the original snapshot.
 

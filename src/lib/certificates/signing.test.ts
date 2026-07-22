@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { canonicalCertificatePayload, signCertificate, verifyCertificateSignature } from "./signing";
+import {
+  CertificateSigningKeyConfigError,
+  canonicalCertificatePayload,
+  loadCertificateSigningKey,
+  signCertificate,
+  verifyCertificateSignature,
+} from "./signing";
 
 const fields = {
   id: "cert_1",
@@ -38,5 +44,40 @@ describe("signCertificate / verifyCertificateSignature", () => {
 
   it("fails verification against a garbage signature", () => {
     expect(verifyCertificateSignature(fields, "not-a-real-signature")).toBe(false);
+  });
+});
+
+describe("loadCertificateSigningKey", () => {
+  const validSingleLine =
+    '-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIDCBO+Duf7yvCOaoxOJAAaXtWG6KA2oLuUFa58NQYUaI\n-----END PRIVATE KEY-----'.replace(
+      /\n/g,
+      "\\n",
+    );
+
+  it("loads a correctly-escaped single-line PEM", () => {
+    expect(() => loadCertificateSigningKey(validSingleLine)).not.toThrow();
+  });
+
+  it("throws a clear, named error when the env var is the empty placeholder", () => {
+    // Passing "" directly (rather than omitting the arg) avoids falling
+    // through to the default parameter's real process.env value, which
+    // .env.test always populates.
+    expect(() => loadCertificateSigningKey("")).toThrow(CertificateSigningKeyConfigError);
+    expect(() => loadCertificateSigningKey("")).toThrow(/is not set/);
+  });
+
+  it("throws a clear, named error when a raw multi-line PEM was pasted and truncated by dotenv", () => {
+    // Simulates the real failure mode: dotenv parses .env line-by-line, so a
+    // multi-line PEM pasted without \n escapes silently truncates to just
+    // the BEGIN line by the time it reaches process.env.
+    const truncatedByDotenv = "-----BEGIN PRIVATE KEY-----";
+    expect(() => loadCertificateSigningKey(truncatedByDotenv)).toThrow(CertificateSigningKeyConfigError);
+    expect(() => loadCertificateSigningKey(truncatedByDotenv)).toThrow(/BEGIN\/END markers/);
+  });
+
+  it("throws a clear, named error when markers are present but the key body is invalid", () => {
+    const corruptBody = "-----BEGIN PRIVATE KEY-----\\nnot-valid-base64-key-content\\n-----END PRIVATE KEY-----";
+    expect(() => loadCertificateSigningKey(corruptBody)).toThrow(CertificateSigningKeyConfigError);
+    expect(() => loadCertificateSigningKey(corruptBody)).toThrow(/invalid or truncated/);
   });
 });
