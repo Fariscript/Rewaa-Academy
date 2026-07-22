@@ -343,6 +343,30 @@ placeholder home. A second build run closed that:
   (redo-detection/fresh-attempt grant, chain-ordering unlock check) is
   proceeding this session; work depending on the new field is held until
   the schema is confirmed.
+- **2026-07-22 (Ibrahim's session) — confirmed yes on open item #3
+  independently**, reached before seeing the entry above, landing on the
+  same resolution — no actual conflict, just two sessions answering the
+  same question in parallel. Also gave initial direction, then a concrete
+  schema, on the content-model shape requested in "Handoff to Ibrahim's
+  track." Full text is in CLAUDE.md's "Handoff to testing-engine track"
+  section.
+- **2026-07-22 (Ibrahim's session, same day) — FR-12 admin
+  content-management UI shipped** on top of the content-model schema:
+  `/admin/content` (taxonomy tree → lesson → content items),
+  create/edit/publish/unpublish/reorder, revision history + restore
+  (T-36), VIDEO/PDF/IMAGE upload to local disk (explicitly dev-only).
+  Branch `claude/lms-content-admin-ui`, stacked on
+  `claude/lms-handoff-response` (both still unmerged to `main` as of this
+  entry — merge order matters). Verified two ways, not just claimed: 34
+  new automated tests (full suite 40 files/205 tests passing), plus a live
+  browser walkthrough with a forged admin session (no OAuth creds
+  available locally) that found and fixed a real bug — a restored
+  revision updated the database correctly but the edit form kept showing
+  stale pre-restore content until a hard reload, since `router.refresh()`
+  doesn't remount an already-initialized client component. Full detail,
+  plus a flagged-not-fixed finding (uploaded asset URLs are auth-gated but
+  not sector-scoped, same precedent as certificate PDFs), is in CLAUDE.md's
+  "Handoff to testing-engine track" section, not duplicated here.
 
 Everything below is the original snapshot.
 

@@ -42,3 +42,6 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# dev-only local-disk content asset storage (src/lib/content/upload-asset.ts)
+/public/uploads
