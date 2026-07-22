@@ -251,6 +251,26 @@ placeholder home. A second build run closed that:
   one override aggregate — commit history has the change), quiz catalog
   ~28ms, trainee content API ~27ms, home SSR ~150ms. Re-run the script
   after touching `src/lib/dashboard/` or `trainee-progress.ts`.
+- *(A perf-sanity re-run extending coverage to the T-24 paths is on the
+  separate `claude/testing-cert-signing-key-validation` branch/PR — not
+  duplicated here; it'll land in this file once that PR merges.)*
+- **2026-07-22 — CEO decision on open item #4 recorded in CLAUDE.md, no
+  code changed.** Manual grading is out: non-auto-graded items are now
+  graded automatically, routed by type (deterministic action-log
+  comparison, Gemini for video, AI-based for open text/voice). Full
+  decision text, the still-open implementation blockers (sandbox vs. live,
+  consent/retention, cost, Gemini key/budget), and a new "Handoff to
+  Ibrahim's track" section are in CLAUDE.md — the latter flags that
+  action-simulation needs structured lesson-asset access his content
+  system doesn't have a home for yet, and that AI question-drafting has
+  been verified this session to ground on lesson *titles* only (the
+  `Lesson` model has no content field at all), so both problems trace back
+  to the same content-model gap. A schema proposal for the two new
+  `QuestionType` values (`VOICE_PROMPT`, `ACTION_SIMULATION`) and their
+  extra fields was drafted and shared for review — **not applied**, per
+  the standing rule to stop before touching `prisma/schema.prisma`.
+  Grading pipeline, Gemini integration, and the simulation engine are
+  explicitly not started.
 - **2026-07-22 — open item #2 (sector reassignment) RESOLVED and
   implemented, unblocked unlike item #4** (no API key/sandbox/cost
   question). Full decision text is in CLAUDE.md. Short version: reassigning
@@ -267,6 +287,17 @@ placeholder home. A second build run closed that:
   open in CLAUDE.md, not guessed at. `src/lib/admin/assign-sector.ts` and
   the sector-assignment UI/action itself were not touched (Ibrahim's
   track).
+- **2026-07-22 (follow-up) — Ibrahim confirmed content ownership.** Source
+  lesson content, screenshots, and any assets this engine would ground
+  question-drafting or action-simulation hotspots in are his track's
+  responsibility, via the Admin role/interface — resolves the ownership
+  half of the "Handoff to Ibrahim's track" open question, not the technical
+  shape. Full detail (including the downstream dependency this creates for
+  content-grounding and hotspot-asset sourcing) is in CLAUDE.md's
+  "Handoff to Ibrahim's track" section, not duplicated here.
+- **2026-07-22 (follow-up) — open item #3 (lesson-unlock ownership) gets a
+  proposed resolution, NOT marked resolved — awaiting Ibrahim's yes/no.**
+  Full proposal (forwardable as-is) is in CLAUDE.md's open item #3.
 
 Everything below is the original snapshot.
 
