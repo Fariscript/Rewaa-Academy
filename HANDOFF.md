@@ -251,6 +251,26 @@ placeholder home. A second build run closed that:
   one override aggregate — commit history has the change), quiz catalog
   ~28ms, trainee content API ~27ms, home SSR ~150ms. Re-run the script
   after touching `src/lib/dashboard/` or `trainee-progress.ts`.
+- *(A perf-sanity re-run extending coverage to the T-24 paths is on the
+  separate `claude/testing-cert-signing-key-validation` branch/PR — not
+  duplicated here; it'll land in this file once that PR merges.)*
+- **2026-07-22 — CEO decision on open item #4 recorded in CLAUDE.md, no
+  code changed.** Manual grading is out: non-auto-graded items are now
+  graded automatically, routed by type (deterministic action-log
+  comparison, Gemini for video, AI-based for open text/voice). Full
+  decision text, the still-open implementation blockers (sandbox vs. live,
+  consent/retention, cost, Gemini key/budget), and a new "Handoff to
+  Ibrahim's track" section are in CLAUDE.md — the latter flags that
+  action-simulation needs structured lesson-asset access his content
+  system doesn't have a home for yet, and that AI question-drafting has
+  been verified this session to ground on lesson *titles* only (the
+  `Lesson` model has no content field at all), so both problems trace back
+  to the same content-model gap. A schema proposal for the two new
+  `QuestionType` values (`VOICE_PROMPT`, `ACTION_SIMULATION`) and their
+  extra fields was drafted and shared for review — **not applied**, per
+  the standing rule to stop before touching `prisma/schema.prisma`.
+  Grading pipeline, Gemini integration, and the simulation engine are
+  explicitly not started.
 
 Everything below is the original snapshot.
 
