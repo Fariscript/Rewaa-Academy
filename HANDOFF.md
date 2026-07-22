@@ -271,6 +271,14 @@ placeholder home. A second build run closed that:
   the standing rule to stop before touching `prisma/schema.prisma`.
   Grading pipeline, Gemini integration, and the simulation engine are
   explicitly not started.
+- **2026-07-22 (follow-up) — Ibrahim confirmed content ownership.** Source
+  lesson content, screenshots, and any assets this engine would ground
+  question-drafting or action-simulation hotspots in are his track's
+  responsibility, via the Admin role/interface — resolves the ownership
+  half of the "Handoff to Ibrahim's track" open question, not the technical
+  shape. Full detail (including the downstream dependency this creates for
+  content-grounding and hotspot-asset sourcing) is in CLAUDE.md's
+  "Handoff to Ibrahim's track" section, not duplicated here.
 
 Everything below is the original snapshot.
 

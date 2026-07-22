@@ -187,6 +187,26 @@ session is stating as open questions, not deciding on his behalf:
   *source* content those reference actually comes from. That's squarely
   FR-18/T-36 territory, his track's call.
 
+**Update 2026-07-22 — ownership confirmed, shape still open:** Ibrahim
+confirmed content uploading and management — the source lesson content,
+screenshots, and any assets this engine would eventually ground
+question-drafting or action-simulation hotspots in — is his track's
+responsibility, done via the Admin role/interface. This resolves the
+*ownership* half of the open question above. It does **not** resolve the
+*technical shape*: what the content model looks like, how assets are
+structured, how hotspot/screenshot data would be exposed for a simulation
+to reference. That design is still his track's call — this session isn't
+guessing at it or proposing a schema for it.
+
+Concrete downstream dependency this creates for the testing engine, on
+record: once his track builds this, two things in this session's scope
+become unblocked — (1) grounding AI-drafted questions in real lesson
+content instead of just a title string (the gap confirmed in this
+session's earlier content-grounding finding, above), and (2) sourcing
+screenshot/hotspot assets for the content-driven action-simulation grading
+path. Neither is buildable on this side until his content system exists;
+not started here.
+
 ## Known fragilities
 
 Not CEO decisions — internal engineering caveats worth grepping for before
