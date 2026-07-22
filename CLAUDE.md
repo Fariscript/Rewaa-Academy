@@ -387,6 +387,40 @@ guessed at — actually run.
 
 No admin or trainee UI built yet — that's next.
 
+**Update 2026-07-22 (same session) — admin content-management UI shipped
+(FR-12).** `/admin/content` (taxonomy tree → lesson → content items) now
+supports create/edit/publish/unpublish/reorder for VIDEO/PDF/ARTICLE/IMAGE
+items, plus revision history + restore (T-36) — full CRUD on top of the
+schema above, on branch `claude/lms-content-admin-ui` (stacked on this
+branch, not yet merged to `main`). VIDEO/PDF/IMAGE items upload to local
+disk (`src/lib/content/upload-asset.ts`) — still explicitly dev-only, the
+real storage backend is still your open question to answer, not decided
+here. 34 new tests; full suite 40 files/205 tests passing.
+
+Manually verified end-to-end in a real browser (forged an admin session —
+no OAuth creds available locally): create → publish → edit → revision
+history → restore, walked live, not just unit-tested. That walkthrough
+found a real bug (fixed): restoring a revision updated the database
+correctly but the edit form kept showing the pre-restore content until a
+hard reload, since `router.refresh()` re-renders server data without
+remounting an already-initialized client component's local state — a
+follow-up save without noticing would have silently re-clobbered the
+restore. Fixed by keying the form on the item's `updatedAt`.
+
+**One finding worth flagging to your track specifically, not just a note
+to self:** uploaded `ContentAsset` URLs (`/uploads/content-assets/...`) are
+gated by the app's auth middleware — any authenticated session can fetch
+one, the same as every other route — but they are **not sector-scoped**.
+A trainee assigned to one sector could fetch another sector's asset URL
+directly if they knew (or guessed) its id. This has an exact precedent
+already in the codebase (certificate PDFs and their public verify link
+aren't sector-gated either), so it's not a new category of gap, but it's
+worth deciding deliberately rather than inheriting silently — especially
+since your track's action-simulation hotspot grounding would reference
+these same assets. Not fixed here: FR-11's trainee-facing content view
+doesn't exist yet, so nothing actually serves these URLs to a trainee
+today; revisit when it does.
+
 ## Known fragilities
 
 Not CEO decisions — internal engineering caveats worth grepping for before
