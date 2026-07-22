@@ -1,7 +1,7 @@
 import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, NotFoundError, UnauthenticatedError } from "@/lib/errors";
-import { syncExpiry } from "./attempt-lifecycle";
+import { assertTraineeSectorMatchesQuiz, syncExpiry } from "./attempt-lifecycle";
 
 export interface AnswerInput {
   questionId: string;
@@ -20,6 +20,9 @@ export async function saveAnswers(session: Session | null, attemptId: string, an
   const attempt = await prisma.attempt.findUnique({ where: { id: attemptId } });
   if (!attempt) throw new NotFoundError("Attempt not found");
   if (attempt.userId !== session.user.id) throw new ForbiddenError();
+  // Open item #2: reassigned away from this quiz's sector — inaccessible
+  // (not deleted) until reassigned back. See attempt-lifecycle.ts.
+  await assertTraineeSectorMatchesQuiz(session.user.id, attempt.quizId);
 
   const synced = await syncExpiry(attemptId);
   if (synced.status !== "IN_PROGRESS") {

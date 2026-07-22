@@ -271,6 +271,22 @@ placeholder home. A second build run closed that:
   the standing rule to stop before touching `prisma/schema.prisma`.
   Grading pipeline, Gemini integration, and the simulation engine are
   explicitly not started.
+- **2026-07-22 — open item #2 (sector reassignment) RESOLVED and
+  implemented, unblocked unlike item #4** (no API key/sandbox/cost
+  question). Full decision text is in CLAUDE.md. Short version: reassigning
+  a trainee starts the new sector's quizzes at zero (already automatic, no
+  code needed) and never deletes progress in the old sector — it's
+  inaccessible while away, fully restored (exact attempt-cap state) if
+  reassigned back. Reads/start-attempt were already sector-scoped; the real
+  gap was `saveAnswers`/`submitAttempt` checking ownership but not current
+  sector, letting a reassigned-away trainee still mutate an old attempt —
+  fixed with a shared check in `attempt-lifecycle.ts`, regression test in
+  `src/lib/quiz/sector-reassignment.test.ts`. Two edges (certificate
+  validity after reassignment; an attempt in-progress at the exact
+  reassignment moment — confirmed reachable, not moot) are explicitly left
+  open in CLAUDE.md, not guessed at. `src/lib/admin/assign-sector.ts` and
+  the sector-assignment UI/action itself were not touched (Ibrahim's
+  track).
 - **2026-07-22 (follow-up) — Ibrahim confirmed content ownership.** Source
   lesson content, screenshots, and any assets this engine would ground
   question-drafting or action-simulation hotspots in are his track's

@@ -96,7 +96,63 @@ roleplay (T-30), deeper dashboard analytics (T-24).
 
 1. What happens after 2 failed attempts — blocked, flagged for manual
    review, or something else?
-2. Sector reassignment mid-program — does quiz progress carry over or reset?
+2. **RESOLVED 2026-07-22 — the CEO's decision, recorded here verbatim:**
+   - Reassignment to a new sector starts that sector's quizzes at zero.
+     Confirmed already-automatic, no new code needed: quizzes in different
+     sectors are different `Quiz` records, and attempt-cap/history queries
+     are always scoped to `{userId, quizId}` (`src/lib/quiz/start-attempt.ts`)
+     — a trainee has zero existing attempts against a quiz they've never
+     been assigned to.
+   - Progress in a sector a trainee is reassigned away from is never
+     deleted. It becomes inaccessible while they're not currently assigned
+     to that sector, and is fully restored — exact state, not just
+     history — if they're ever reassigned back. "Exact state" explicitly
+     includes attempt-cap consumption: 1 of 2 attempts used resumes as 1
+     remaining, not a reset cap.
+
+     **Implemented this session.** Reads (`getQuizOutcome`,
+     `getAttemptForTrainee`, `getQuizResultForTrainee`) and starting a new
+     attempt (`startAttempt`, via `isQuizUnlocked`) were already
+     sector-scoped this way. The actual gap was on the write side:
+     `saveAnswers` and `submitAttempt` checked ownership (`userId`) but not
+     the trainee's *current* sector, so a trainee reassigned away from a
+     quiz's sector could still mutate an attempt on it even though reading
+     it was already denied — fixed via a shared
+     `assertTraineeSectorMatchesQuiz` check (added to
+     `src/lib/quiz/attempt-lifecycle.ts`, called from both), and made
+     explicit rather than an implicit side effect of a later outcome read
+     in `getAttemptForTrainee`. Regression test:
+     `src/lib/quiz/sector-reassignment.test.ts` (attempt 1 used → reassign
+     away → confirm inaccessible for reads and writes → reassign back →
+     confirm exact 1-of-2 state restored). No schema/persistence change was
+     needed: attempt rows were never sector-filtered at the query level, so
+     restoring access on reassignment-back was already automatic once the
+     write-side gap closed.
+   - Two edges explicitly NOT decided — recorded as open, not guessed at:
+     - **(a) Does an already-earned certificate from the old sector stay
+       valid/visible after reassignment?** Current incidental behavior,
+       not a decision: a trainee's own certificate page
+       (`src/app/(trainee)/certificate/page.tsx`) is scoped to their
+       *current* sector only (`certificate.findUnique({ userId_sectorId })`),
+       so an old certificate becomes invisible there after reassignment —
+       the row itself is never deleted, and its direct link plus the
+       public verify endpoint remain reachable regardless of sector, since
+       neither is sector-gated.
+     - **(b) What happens to an attempt that's
+       in-progress-but-unsubmitted at the exact moment of reassignment?**
+       Checked, not assumed: **confirmed reachable, not moot** —
+       `src/lib/admin/assign-sector.ts`'s reassignment write has zero
+       interaction with the `Attempt` table, so an Admin can reassign a
+       trainee mid-quiz at any real moment, `IN_PROGRESS` or not. Current
+       incidental behavior after this session's fix, not a decision: that
+       attempt becomes immediately inaccessible for both reads and writes
+       (the trainee's countdown effectively freezes from their side —
+       save/submit calls start failing with `ForbiddenError`), but it is
+       **not** force-finalized; it stays `IN_PROGRESS` until its natural
+       `expiresAt` passes and something next reads it in a sector-matching
+       context (e.g. after being reassigned back). Whether it *should* be
+       force-submitted, invalidated, or something else at the moment of
+       reassignment is undecided.
 3. **PROPOSED 2026-07-22 — awaiting Ibrahim's confirmation, NOT resolved**
    (only he can confirm this, not decided unilaterally here). Re-read the
    actual code fresh before drafting this, not assumed:
