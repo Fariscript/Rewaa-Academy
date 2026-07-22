@@ -24,10 +24,13 @@ listed below as a dependency.
 - **AI drafts quiz questions.** An Admin must approve, edit, or reject every
   single one before it can reach a trainee. This is a hard gate — no
   auto-publish path, no exceptions. (T-10, T-11, T-12, NFR-06)
-- MCQ / true-false → auto-graded. Scenario / free-text / mock-call → routed
-  to Admin for manual grading with written feedback. (T-17, T-18, T-25)
-  ⚠️ Whether manual grading must also hit 95% is **unresolved** — see Open
-  Items below. Don't hardcode an assumption.
+- MCQ / true-false → auto-graded. **Grading direction changed 2026-07-22 —
+  see resolved Open item #4 below**: scenario / free-text / voice / video /
+  action-simulation items are no longer routed to an Admin for manual
+  grading. They're graded automatically, by type (deterministic comparison,
+  Gemini for video, or AI-based for open text/voice). (T-17, T-18, T-25,
+  T-26) Implementation is NOT started — this is a documentation update
+  only; see Open item #4 for what's still blocking the build.
 - **Content items and question-bank items both support versioning**: edit
   history retained, prior versions viewable/restorable, without altering a
   trainee's already-completed records or scores. (FR-12, T-15, T-36, NFR-13)
@@ -93,22 +96,132 @@ roleplay (T-30), deeper dashboard analytics (T-24).
 
 1. What happens after 2 failed attempts — blocked, flagged for manual
    review, or something else?
-2. Sector reassignment mid-program — does quiz progress carry over or reset?
-3. Who owns the lesson-complete → quiz-unlock check: the testing engine or
-   the content system?
+2. **RESOLVED 2026-07-22 — the CEO's decision, recorded here verbatim:**
+   - Reassignment to a new sector starts that sector's quizzes at zero.
+     Confirmed already-automatic, no new code needed: quizzes in different
+     sectors are different `Quiz` records, and attempt-cap/history queries
+     are always scoped to `{userId, quizId}` (`src/lib/quiz/start-attempt.ts`)
+     — a trainee has zero existing attempts against a quiz they've never
+     been assigned to.
+   - Progress in a sector a trainee is reassigned away from is never
+     deleted. It becomes inaccessible while they're not currently assigned
+     to that sector, and is fully restored — exact state, not just
+     history — if they're ever reassigned back. "Exact state" explicitly
+     includes attempt-cap consumption: 1 of 2 attempts used resumes as 1
+     remaining, not a reset cap.
+
+     **Implemented this session.** Reads (`getQuizOutcome`,
+     `getAttemptForTrainee`, `getQuizResultForTrainee`) and starting a new
+     attempt (`startAttempt`, via `isQuizUnlocked`) were already
+     sector-scoped this way. The actual gap was on the write side:
+     `saveAnswers` and `submitAttempt` checked ownership (`userId`) but not
+     the trainee's *current* sector, so a trainee reassigned away from a
+     quiz's sector could still mutate an attempt on it even though reading
+     it was already denied — fixed via a shared
+     `assertTraineeSectorMatchesQuiz` check (added to
+     `src/lib/quiz/attempt-lifecycle.ts`, called from both), and made
+     explicit rather than an implicit side effect of a later outcome read
+     in `getAttemptForTrainee`. Regression test:
+     `src/lib/quiz/sector-reassignment.test.ts` (attempt 1 used → reassign
+     away → confirm inaccessible for reads and writes → reassign back →
+     confirm exact 1-of-2 state restored). No schema/persistence change was
+     needed: attempt rows were never sector-filtered at the query level, so
+     restoring access on reassignment-back was already automatic once the
+     write-side gap closed.
+   - Two edges explicitly NOT decided — recorded as open, not guessed at:
+     - **(a) Does an already-earned certificate from the old sector stay
+       valid/visible after reassignment?** Current incidental behavior,
+       not a decision: a trainee's own certificate page
+       (`src/app/(trainee)/certificate/page.tsx`) is scoped to their
+       *current* sector only (`certificate.findUnique({ userId_sectorId })`),
+       so an old certificate becomes invisible there after reassignment —
+       the row itself is never deleted, and its direct link plus the
+       public verify endpoint remain reachable regardless of sector, since
+       neither is sector-gated.
+     - **(b) What happens to an attempt that's
+       in-progress-but-unsubmitted at the exact moment of reassignment?**
+       Checked, not assumed: **confirmed reachable, not moot** —
+       `src/lib/admin/assign-sector.ts`'s reassignment write has zero
+       interaction with the `Attempt` table, so an Admin can reassign a
+       trainee mid-quiz at any real moment, `IN_PROGRESS` or not. Current
+       incidental behavior after this session's fix, not a decision: that
+       attempt becomes immediately inaccessible for both reads and writes
+       (the trainee's countdown effectively freezes from their side —
+       save/submit calls start failing with `ForbiddenError`), but it is
+       **not** force-finalized; it stays `IN_PROGRESS` until its natural
+       `expiresAt` passes and something next reads it in a sector-matching
+       context (e.g. after being reassigned back). Whether it *should* be
+       force-submitted, invalidated, or something else at the moment of
+       reassignment is undecided.
+3. **PROPOSED 2026-07-22 — awaiting Ibrahim's confirmation, NOT resolved**
+   (only he can confirm this, not decided unilaterally here). Re-read the
+   actual code fresh before drafting this, not assumed:
+
+   `isQuizUnlocked` (`src/lib/content/quiz-unlock.ts`) and
+   `markLessonComplete` (`src/lib/content/lesson-completion.ts`) both live
+   in the testing engine's codebase today. What "lesson complete" means is
+   a single `LessonCompletion` row keyed by `(userId, lessonId)` — nothing
+   content-specific (no video-watch-percentage, no article-scroll state).
+   It's created by a trainee tapping a manual "mark complete" button in the
+   trainee UI (`CompleteLessonButton`), fully decoupled from whatever
+   `Lesson` actually contains. `Lesson` is still FR-12's title-only
+   placeholder, and the richer "watch video + read text" journey (FR-11)
+   that would define a real content-driven completion signal is Not
+   Started — so this data's *source* could plausibly change once Ibrahim's
+   content system builds that journey (e.g. an auto-derived signal instead
+   of today's manual button). That doesn't change where the *check* needs
+   to live, though: `isQuizUnlocked` only depends on the `LessonCompletion`
+   row existing, never on how or where it got created. Nothing about how
+   it's written would make it hard to relocate later either, if that's
+   ever needed — it's a small, self-contained read (a few Prisma queries
+   against shared models, no side effects, no hidden coupling to the rest
+   of the testing engine).
+
+   **Proposed resolution — short enough to forward to Ibrahim as-is for a
+   yes/no:**
+   > Proposal: the lesson-complete → quiz-unlock check (`isQuizUnlocked` /
+   > `markLessonComplete`) formally stays in the testing engine's
+   > codebase — it's already built, tested, and working there. What counts
+   > as "lesson complete" may evolve as your content system matures (e.g.
+   > an auto-derived signal instead of today's manual button), but that's
+   > a future integration point to coordinate on when it happens, not a
+   > reason to move the check itself now. OK to proceed on this basis?
+
+   No code changes implied either way — this is a documentation proposal
+   only, pending his answer.
 3b. T-9 ("prior required content/quizzes are complete") may mean sequential
     ordering across a sector's whole lesson sequence, not just single-lesson
     unlock. Needs confirming with the CEO before Phase 1 launch — retrofitting
     order-enforcement after trainees already have unordered access is
     expensive to unwind.
-4. Does manual grading need to hit the same 95% bar, or is it the grading
-   Admin's judgment? Slice 6 hit this directly: routing to a grading queue
-   (T-18) and per-item grade + feedback capture (T-25) are built and
-   tested, but nothing converts a fully-graded attempt into an overall
-   score/passed (T-26) — an attempt with a manually-graded answer stays
-   PENDING_MANUAL_GRADE indefinitely. TODO(open-item-4) at
-   src/lib/grading/grading.ts and src/lib/quiz/attempt-lifecycle.ts marks
-   exactly where the finalization rule plugs in once this is answered.
+4. **RESOLVED 2026-07-22 — the CEO's direction, recorded here verbatim:**
+   there is no manual grading. Every non-auto-graded item is graded
+   automatically, routed by type:
+   - **Deterministic comparison** for simulation action-logs — no AI call
+     needed, when the trainee's click/step sequence is captured
+     structurally (i.e. compared against an expected action sequence, not
+     interpreted).
+   - **Gemini (native video input)** for anything genuinely video-based.
+   - **AI-based grading** for open text/voice responses.
+
+   This replaces the old "partial credit vs. binary, Admin's judgment"
+   framing entirely — the question is no longer what an Admin decides, it's
+   which automatic grading method a given item type uses. `TODO(open-item-4)`
+   at `src/lib/grading/grading.ts` and `src/lib/quiz/attempt-lifecycle.ts`
+   still marks the exact plug-in points; they haven't been touched yet, and
+   the existing manual-grading queue (T-18/T-25) still exists and works
+   as-is until this is implemented — this is a documentation update, not a
+   code change.
+
+   **This decision does NOT unblock implementation yet.** Still open, and
+   nothing below should be guessed at: sandbox vs. live product for the new
+   AI-grading calls, consent/retention rules for voice/video trainee
+   submissions, cost, and a Gemini API key/budget (parallel to the existing
+   `ANTHROPIC_API_KEY` block on slice 5b). Do not start building the
+   grading pipeline, the Gemini integration, or the action-simulation
+   engine until those are answered. See also "Handoff to Ibrahim's track"
+   below — this decision creates new dependencies on the content system
+   that need his track's input, not a guess from this one.
 5. Notification rules (triggers, channels, wording) — not yet defined.
 6. FR-26 (Call Library & Evaluation) — flagged for a change in the latest
    meeting, but no detail was captured yet.
@@ -125,6 +238,64 @@ These are exactly the decisions that cause expensive rebuilds if guessed
 wrong. If a task depends on one, implement everything around it and leave
 the decision point clearly marked (e.g. a single config value or a TODO
 with the open-item number) rather than picking an assumption silently.
+
+## Handoff to Ibrahim's track — new content dependencies (flagged 2026-07-22)
+
+The resolved open item #4 above introduces new question/task types —
+**voice-prompt** and **action-simulation** — on top of the existing bank.
+This creates dependencies on the content system (his track) that this
+session is stating as open questions, not deciding on his behalf:
+
+- **Content grounding is currently zero.** Verified directly this session:
+  the AI question-drafting prompt (`src/lib/ai/drafter.ts`,
+  `DraftPromptInput`) only ever receives `lessonTitle`, `unitName`, and
+  `skillType` — never any lesson content itself. That's not a drafting-code
+  gap; the `Lesson` model in `prisma/schema.prisma` has no content field at
+  all (`id`, `title`, `unitId` — nothing else), confirming FR-12's existing
+  note that `Lesson` is a title-only placeholder pending his content
+  system. Every AI-drafted question today is generated from a title
+  string, not real lesson material, because there's no real lesson
+  material to ground it in yet.
+- **Action-simulation makes this more acute, not just more of the same.**
+  A content-driven hotspot simulation (trainee clicks through a sequence
+  against a captured UI) needs structured access to lesson screenshots or
+  other content assets — specific images/screens plus per-hotspot
+  target/coordinate data to check the trainee's action log against. There
+  is no home for that in the schema today, and this session isn't
+  proposing one — a `prisma/schema.prisma` proposal for the new
+  `QuestionType` values and their grading-side fields (rubric, expected
+  action sequence) was drafted and shared with Faris for review this
+  session (not applied — standing rule to stop before touching that file),
+  and it deliberately leaves source-asset storage out for exactly this
+  reason.
+- **The open question for his track, stated plainly, not guessed at:**
+  where does structured asset content (screenshots, hotspot maps, and —
+  separately — the real lesson text/video that question-drafting should
+  ground in) live, and how does his authoring system produce/store it?
+  This engine's schema can add fields to `Question` for the *grading* side
+  (rubric, expected action sequence), but it has no answer for where the
+  *source* content those reference actually comes from. That's squarely
+  FR-18/T-36 territory, his track's call.
+
+**Update 2026-07-22 — ownership confirmed, shape still open:** Ibrahim
+confirmed content uploading and management — the source lesson content,
+screenshots, and any assets this engine would eventually ground
+question-drafting or action-simulation hotspots in — is his track's
+responsibility, done via the Admin role/interface. This resolves the
+*ownership* half of the open question above. It does **not** resolve the
+*technical shape*: what the content model looks like, how assets are
+structured, how hotspot/screenshot data would be exposed for a simulation
+to reference. That design is still his track's call — this session isn't
+guessing at it or proposing a schema for it.
+
+Concrete downstream dependency this creates for the testing engine, on
+record: once his track builds this, two things in this session's scope
+become unblocked — (1) grounding AI-drafted questions in real lesson
+content instead of just a title string (the gap confirmed in this
+session's earlier content-grounding finding, above), and (2) sourcing
+screenshot/hotspot assets for the content-driven action-simulation grading
+path. Neither is buildable on this side until his content system exists;
+not started here.
 
 ## Known fragilities
 
