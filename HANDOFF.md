@@ -368,6 +368,16 @@ placeholder home. A second build run closed that:
   not sector-scoped, same precedent as certificate PDFs), is in CLAUDE.md's
   "Handoff to testing-engine track" section, not duplicated here.
 
+- **2026-07-22 (follow-up) — open item #1/#3b implementation finished,
+  QuizFailureRecord schema applied.** The `Owner`-approved schema (one row
+  per `(userId, quizId)`, existence = "ever failed") is now in
+  `prisma/schema.prisma`, migrated (`20260722150011_add_quiz_failure_record`),
+  and wired into `getQuizOutcome`. `markLessonComplete`'s redo-detection,
+  `isQuizUnlocked`'s chain-ordering check, and the admin dashboard's two
+  distinct fields (`failedBothAttempts` point-in-time,
+  `everFailed` permanent) are all built and tested — 209/209 full suite,
+  run 3x clean, tsc/eslint clean. Full detail in CLAUDE.md's open item #1.
+
 Everything below is the original snapshot.
 
 ---

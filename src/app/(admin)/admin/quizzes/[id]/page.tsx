@@ -69,7 +69,8 @@ export default async function AdminQuizDashboardPage({ params }: { params: Promi
         <Tile label="لم يبدؤوا" value={summary.notStarted} />
         <Tile label="على المحاولة الثانية" value={summary.onAttempt2} />
         <Tile label="بانتظار التصحيح" value={summary.awaitingManualGrade} />
-        <Tile label="أخفقوا في المحاولتين" value={summary.failedBothAttempts} />
+        <Tile label="عالقون حاليًا (أخفقوا في المحاولتين)" value={summary.failedBothAttempts} />
+        <Tile label="سبق أن أخفقوا (سجل دائم)" value={summary.everFailed} />
         <Tile label="متوسط الدرجات" value={summary.averageScore === null ? "—" : `${Math.round(summary.averageScore)}%`} />
       </div>
 
@@ -94,7 +95,14 @@ export default async function AdminQuizDashboardPage({ params }: { params: Promi
                   </p>
                 </td>
                 <td className="p-3">
-                  <Badge variant={STATUS_VARIANTS[row.status]}>{QUIZ_STATUS_LABELS[row.status]}</Badge>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Badge variant={STATUS_VARIANTS[row.status]}>{QUIZ_STATUS_LABELS[row.status]}</Badge>
+                    {row.everFailed ? (
+                      <span title="سجل دائم — لا يُزال حتى بعد النجاح لاحقًا">
+                        <Badge variant="neutral">سبق الإخفاق</Badge>
+                      </span>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="p-3" dir="ltr">
                   {row.attemptsUsed}/{row.attemptsAllowed}

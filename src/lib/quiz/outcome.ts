@@ -89,5 +89,24 @@ export async function getQuizOutcome(session: Session | null, quizId: string): P
   const synced = await Promise.all(attempts.map((a) => syncExpiry(a.id)));
   const attemptsAllowed = await getAllowedAttempts(session.user.id, quizId);
 
-  return computeQuizOutcome(synced, attemptsAllowed);
+  const outcome = computeQuizOutcome(synced, attemptsAllowed);
+
+  // Open item #1 (RESOLVED 2026-07-22, see CLAUDE.md): permanent "ever
+  // failed both attempts" record, distinct from `outcome.status` above
+  // (point-in-time — flips back to PASSED once the trainee breaks out of
+  // the redo-loop). Written here, not inside computeQuizOutcome (which
+  // stays pure/DB-free — it's also called directly, per-trainee in a
+  // cohort loop, by the admin dashboard in src/lib/dashboard/), matching
+  // this codebase's established "compute/persist lazily on read" pattern
+  // (see syncExpiry). Idempotent upsert, same no-op-on-repeat shape as
+  // markLessonComplete: once a row exists it is never updated or deleted.
+  if (outcome.status === "FAILED_FINAL_ATTEMPT") {
+    await prisma.quizFailureRecord.upsert({
+      where: { userId_quizId: { userId: session.user.id, quizId } },
+      update: {},
+      create: { userId: session.user.id, quizId },
+    });
+  }
+
+  return outcome;
 }

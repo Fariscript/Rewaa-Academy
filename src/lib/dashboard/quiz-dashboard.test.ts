@@ -6,6 +6,7 @@ import { markLessonComplete } from "@/lib/content/lesson-completion";
 import { startAttempt } from "@/lib/quiz/start-attempt";
 import { saveAnswers } from "@/lib/quiz/save-answers";
 import { submitAttempt } from "@/lib/quiz/submit-attempt";
+import { getQuizOutcome } from "@/lib/quiz/outcome";
 import { createEphemeralQuiz, deleteEphemeralQuiz } from "@/lib/quiz/attempt-test-fixtures";
 import { getQuizDashboard } from "./quiz-dashboard";
 
@@ -50,6 +51,7 @@ describe("getQuizDashboard (GET /api/admin/dashboard/quizzes/:id)", () => {
     onAttempt2: "dash-on-attempt-2@example.com",
     failedBoth: "dash-failed-both@example.com",
     passed: "dash-passed@example.com",
+    everFailed: "dash-ever-failed@example.com",
   };
 
   beforeAll(async () => {
@@ -93,6 +95,19 @@ describe("getQuizDashboard (GET /api/admin/dashboard/quizzes/:id)", () => {
     const passedSession = sessionFor(passedTrainee.id, "TRAINEE");
     const p1 = await startAttempt(passedSession, quiz.id);
     await submitWith(passedSession, p1.id, true);
+
+    // everFailed: fails both attempts AND has getQuizOutcome called for
+    // them directly (open item #1's permanent-record write only happens
+    // there, not inside computeQuizOutcome/getQuizDashboard's bulk path —
+    // this trainee exercises that write; failedBoth above deliberately
+    // does not, so the two trainees together prove the distinction).
+    const everFailedTrainee = await prisma.user.findUniqueOrThrow({ where: { email: emails.everFailed } });
+    const everFailedSession = sessionFor(everFailedTrainee.id, "TRAINEE");
+    const ef1 = await startAttempt(everFailedSession, quiz.id);
+    await submitWith(everFailedSession, ef1.id, false);
+    const ef2 = await startAttempt(everFailedSession, quiz.id);
+    await submitWith(everFailedSession, ef2.id, false);
+    await getQuizOutcome(everFailedSession, quiz.id);
   });
 
   afterAll(async () => {
@@ -122,14 +137,28 @@ describe("getQuizDashboard (GET /api/admin/dashboard/quizzes/:id)", () => {
     expect(byEmail(emails.passed).status).toBe("PASSED");
     expect(byEmail(emails.passed).bestScore).toBe(100);
 
-    // Only the 5 dashboard-fixture trainees may or may not be the only
+    // Open item #1: the two distinct fields, not collapsed into one.
+    // failedBoth never had getQuizOutcome called for it directly (only
+    // submitAttempt, then this dashboard read) — the permanent record is
+    // only written by getQuizOutcome, so it must still be false here even
+    // though the point-in-time status is FAILED_FINAL_ATTEMPT.
+    expect(byEmail(emails.failedBoth).everFailed).toBe(false);
+    // everFailed DID have getQuizOutcome called directly after failing —
+    // its permanent record exists and must show true here too.
+    expect(byEmail(emails.everFailed).everFailed).toBe(true);
+    expect(byEmail(emails.everFailed).status).toBe("FAILED_FINAL_ATTEMPT");
+    expect(byEmail(emails.notStarted).everFailed).toBe(false);
+    expect(byEmail(emails.passed).everFailed).toBe(false);
+
+    // Only the 6 dashboard-fixture trainees may or may not be the only
     // ones in this sector (trainee@example.com is also assigned to
     // الخدمات) — assert containment, not an exact count/average.
-    expect(dashboard.summary.totalTrainees).toBeGreaterThanOrEqual(5);
+    expect(dashboard.summary.totalTrainees).toBeGreaterThanOrEqual(6);
     expect(dashboard.summary.notStarted).toBeGreaterThanOrEqual(1);
     expect(dashboard.summary.inProgress).toBeGreaterThanOrEqual(2);
     expect(dashboard.summary.passed).toBeGreaterThanOrEqual(1);
-    expect(dashboard.summary.failedBothAttempts).toBeGreaterThanOrEqual(1);
+    expect(dashboard.summary.failedBothAttempts).toBeGreaterThanOrEqual(2);
+    expect(dashboard.summary.everFailed).toBeGreaterThanOrEqual(1);
     expect(dashboard.summary.onAttempt2).toBeGreaterThanOrEqual(1);
     expect(dashboard.summary.averageScore).not.toBeNull(); // T-22
   });

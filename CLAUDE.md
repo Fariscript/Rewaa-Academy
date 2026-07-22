@@ -127,16 +127,33 @@ roleplay (T-30), deeper dashboard analytics (T-24).
      two options this session's investigation flagged — the existing
      `FAILED_FINAL_ATTEMPT`/`failedBothAttempts` status is point-in-time
      only and would lose the "ever failed" fact once a trainee passes, so
-     it does not satisfy this on its own; a new persistent field is
-     needed. A schema proposal for it was drafted and shared for
-     review — **not applied**, per the standing rule to stop before
-     touching `prisma/schema.prisma`.
+     it does not satisfy this on its own; a new persistent field was
+     needed. **Schema confirmed and applied 2026-07-22**: `QuizFailureRecord`
+     (`prisma/schema.prisma`) — one row per `(userId, quizId)`, created the
+     first time `getQuizOutcome` (`src/lib/quiz/outcome.ts`) resolves a
+     trainee's status to `FAILED_FINAL_ATTEMPT`, never updated or deleted
+     afterward. Row existence is the flag.
 
-   Implementation (`markLessonComplete`'s redo-detection/fresh-attempt
-   grant, `quiz-unlock.ts`'s chain-ordering check, the automatic
-   attempt-grant mechanism) is in progress this session, gated on the
-   schema proposal above being confirmed before it's applied — see
-   `HANDOFF.md` for status.
+   **Implementation done.** `markLessonComplete`
+   (`src/lib/content/lesson-completion.ts`) detects a redo (a repeat call
+   while the lesson's quiz is `FAILED_FINAL_ATTEMPT`) and grants a fresh
+   2-attempt window automatically via `grantAutomaticFreshAttempts`
+   (`src/lib/admin/attempt-override.ts`, attributed to a dedicated system
+   `User`, not a real Admin). `isQuizUnlocked`
+   (`src/lib/content/quiz-unlock.ts`) enforces chain-ordering: the previous
+   lesson in the same `Unit` (createdAt-ordered — a stand-in pending a real
+   ordering field from Ibrahim's content system, see "Handoff to Ibrahim's
+   track") must have its own quiz passed. The admin per-quiz dashboard
+   (`src/lib/dashboard/quiz-dashboard.ts`, `/admin/quizzes/[id]`) surfaces
+   both fields distinctly: `failedBothAttempts` (point-in-time, clears on
+   redo) and `everFailed` (permanent, never clears). Tests:
+   `src/lib/quiz/redo-loop.test.ts` (fails → redoes → fresh window → passes,
+   with the permanent record confirmed to survive the eventual pass; stays
+   stuck until an actual redo, mere reads never grant anything),
+   `src/lib/content/quiz-unlock.test.ts`'s chain-ordering block (the
+   owner's own Zoho-CRM-unaffected example), and
+   `src/lib/dashboard/quiz-dashboard.test.ts` (the two dashboard fields
+   proven distinct, not collapsed).
 2. **RESOLVED 2026-07-22 — the CEO's decision, recorded here verbatim:**
    - Reassignment to a new sector starts that sector's quizzes at zero.
      Confirmed already-automatic, no new code needed: quizzes in different

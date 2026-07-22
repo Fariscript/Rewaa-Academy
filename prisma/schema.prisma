@@ -54,6 +54,8 @@ model User {
   attemptCapOverrides        AttemptCapOverride[] @relation("AttemptCapOverrideUser")
   grantedAttemptCapOverrides AttemptCapOverride[] @relation("AttemptCapOverrideGrantedBy")
 
+  quizFailureRecords QuizFailureRecord[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -263,6 +265,7 @@ model Quiz {
   attempts  Attempt[]
 
   attemptCapOverrides AttemptCapOverride[]
+  failureRecords      QuizFailureRecord[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -393,6 +396,28 @@ model AttemptCapOverride {
 
   @@index([userId, quizId])
   @@map("attempt_cap_overrides")
+}
+
+// Open item #1 (RESOLVED 2026-07-22, see CLAUDE.md): permanent record of
+// whether a trainee has EVER failed both attempts on a quiz — distinct
+// from Attempt/computeQuizOutcome's point-in-time status, which flips back
+// to PASSED once they eventually succeed and would lose this fact. Row
+// existence IS the flag: created the first time a trainee hits
+// FAILED_FINAL_ATTEMPT on a given quiz (src/lib/quiz/outcome.ts), never
+// updated or deleted afterward — that permanence is the whole point.
+// "Eventually passed or not" needs no field here: it's
+// computeQuizOutcome's existing `passed`, read alongside this record on
+// the dashboard, not merged into it.
+model QuizFailureRecord {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId        String
+  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  firstFailedAt DateTime @default(now())
+
+  @@unique([userId, quizId])
+  @@map("quiz_failure_records")
 }
 
 // T-19: trainee id, quiz id, timestamp, answers, score, outcome all live

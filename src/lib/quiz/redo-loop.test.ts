@@ -30,10 +30,10 @@ async function submitWithScore(session: Session, quizId: string, mcqRight: boole
 
 // Open item #1 (RESOLVED 2026-07-22, see CLAUDE.md): a trainee who fails
 // both attempts is not permanently stuck — redoing the lesson grants a
-// fresh 2-attempt window automatically, repeating until they pass.
-// "Ever failed" as a PERMANENT dashboard record is a separate, still-
-// unconfirmed schema addition (proposed, not applied) — not assertable
-// here yet; these tests cover the current-status half only.
+// fresh 2-attempt window automatically, repeating until they pass. The
+// QuizFailureRecord row (permanent "ever failed" flag, distinct from
+// `status`'s point-in-time state) is written as a side effect of
+// getQuizOutcome — see src/lib/quiz/outcome.ts.
 describe("redo-loop: fresh attempt window on lesson redo (open item #1)", () => {
   it("fails both attempts, redoes the lesson, gets a fresh window, then passes", async () => {
     const trainee = await prisma.user.findUniqueOrThrow({ where: { email: "trainee@example.com" } });
@@ -51,6 +51,13 @@ describe("redo-loop: fresh attempt window on lesson redo (open item #1)", () => 
       expect(outcome.status).toBe("FAILED_FINAL_ATTEMPT");
       expect(outcome.attemptsUsed).toBe(2);
       expect(outcome.attemptsAllowed).toBe(2);
+
+      // Permanent record written the moment status first resolves to
+      // FAILED_FINAL_ATTEMPT.
+      const failureRecord = await prisma.quizFailureRecord.findUnique({
+        where: { userId_quizId: { userId: trainee.id, quizId: quiz.id } },
+      });
+      expect(failureRecord).not.toBeNull();
 
       // Redo: marking an already-completed, currently-stuck lesson complete
       // again is the redo event — it must grant a fresh window automatically.
@@ -77,6 +84,15 @@ describe("redo-loop: fresh attempt window on lesson redo (open item #1)", () => 
       outcome = await getQuizOutcome(session, quiz.id);
       expect(outcome.passed).toBe(true);
       expect(outcome.status).toBe("PASSED");
+
+      // The permanent record survives the eventual pass — current status
+      // flipped to PASSED, but "ever failed" stays true forever, exactly
+      // the distinction open item #1 asked for.
+      const failureRecordAfterPass = await prisma.quizFailureRecord.findUnique({
+        where: { userId_quizId: { userId: trainee.id, quizId: quiz.id } },
+      });
+      expect(failureRecordAfterPass).not.toBeNull();
+      expect(failureRecordAfterPass?.firstFailedAt).toEqual(failureRecord?.firstFailedAt);
     } finally {
       await deleteEphemeralQuiz(lesson.id);
     }
@@ -95,6 +111,11 @@ describe("redo-loop: fresh attempt window on lesson redo (open item #1)", () => 
       const stuck = await getQuizOutcome(session, quiz.id);
       expect(stuck.status).toBe("FAILED_FINAL_ATTEMPT");
       expect(stuck.attemptsAllowed).toBe(2);
+
+      const failureRecord = await prisma.quizFailureRecord.findUnique({
+        where: { userId_quizId: { userId: trainee.id, quizId: quiz.id } },
+      });
+      expect(failureRecord).not.toBeNull();
 
       // Merely re-reading status (outcome or unlock check) is not a redo —
       // it must never itself trigger a grant.
