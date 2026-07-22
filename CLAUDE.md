@@ -513,6 +513,55 @@ these same assets. Not fixed here: FR-11's trainee-facing content view
 doesn't exist yet, so nothing actually serves these URLs to a trainee
 today; revisit when it does.
 
+**Update 2026-07-22 (later same day) — both tracks fully merged, demo-ready
+at `f7c3aca`.** `main` now has your redo-loop implementation (commit
+`8a57fd6`) plus my remaining piece (the admin content nav tab), merged
+clean — no conflicts, since your work never touched `layout.tsx` or any
+content-model file. Full combined verification, not assumed: fresh
+`npm install`/`prisma generate`/`prisma migrate dev`, `tsc`/`eslint` clean,
+**41 files/209 tests passing, run 3×**. (One re-seed was needed —
+`system-redo-loop@rewaa-internal.local` hadn't been seeded into my local
+DBs yet; not a bug, just hadn't re-seeded after pulling your migration.)
+
+**The one cross-track integration point you asked me to check directly —
+chain-ordering/redo-loop against real seeded content — is confirmed
+working, not guessed at.** Real seed data has exactly one lesson per
+`Unit` (as you'd already flagged), so I created a genuine second
+lesson+quiz under the real seeded "أول مكالمة" unit and walked the full
+flow over real HTTP with a forged trainee session: lesson 1 complete →
+quiz 2 correctly locked → fail both attempts on quiz 1 → quiz 2 still
+locked even after separately completing lesson 2 → redo lesson 1 →
+automatic `AttemptCapOverride` granted correctly → pass on the fresh
+attempt → quiz 2 unlocks → admin dashboard shows both required permanent
+facts side-by-side ("ناجح" / "سبق الإخفاق") for that trainee. Test
+artifacts (the extra lesson/quiz, the trainee's attempts/overrides/
+failure-record from this run) were cleaned up afterward — dev DB is back
+to its normal seeded state.
+
+**One real finding from that check, flagged not fixed — yours to decide,
+not mine to patch:** `QuizFailureRecord` (the row your dashboard's
+"سبق الإخفاق" flag reads) is written lazily inside the trainee-session-
+scoped `getQuizOutcome` (`src/lib/quiz/outcome.ts`), not eagerly at
+`submitAttempt`, and not by the dashboard's own per-trainee loop either —
+`quiz-dashboard.ts` calls the pure `computeQuizOutcome` directly, never
+`getQuizOutcome`. In my test the record got created via a side-effect read
+(the chain-check's `isQuizUnlocked` call), and in normal usage it'd get
+created just as naturally via the trainee's own result-page view right
+after a failing submit — so this isn't a demo blocker. But there's a
+narrow edge: if a trainee fails both attempts and neither they nor
+anything else ever calls `getQuizOutcome` for that quiz again, the
+dashboard's persistent flag never populates, even though the point-in-time
+status still computes correctly for that same render. Worth knowing,
+your call on whether it needs closing.
+
+Dev server verified running clean on webpack (`next dev --webpack`, per
+the known Turbopack/`instrumentation.ts` issue your fix addressed) —
+also found and fixed in passing: a stale already-running dev server (from
+before today's `prisma generate`) was live-crashing on
+`prisma.quizFailureRecord.upsert` (cached client predates the new model).
+Restarted it; not a code bug, just a process that needed a restart after
+the schema changed.
+
 ## Known fragilities
 
 Not CEO decisions — internal engineering caveats worth grepping for before
