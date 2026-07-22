@@ -308,13 +308,17 @@ placeholder home. A second build run closed that:
 - **2026-07-22 (follow-up) — open item #3 (lesson-unlock ownership) gets a
   proposed resolution, NOT marked resolved — awaiting Ibrahim's yes/no.**
   Full proposal (forwardable as-is) is in CLAUDE.md's open item #3.
-- **2026-07-22 (Ibrahim's session) — confirmed yes on open item #3**
-  (independently of, but in agreement with, the owner decision found on
-  unmerged branch `claude/testing-open-item-3-owner-decision`) and gave
-  initial direction on the content-model shape requested in "Handoff to
-  Ibrahim's track." Full text is in CLAUDE.md's new "Handoff to
-  testing-engine track" section — design is starting, not finished; no
-  schema written yet.
+- **2026-07-22 (follow-up) — open item #3 (lesson-unlock ownership)
+  RESOLVED, decided by Faris (project owner) directly, not by Ibrahim's
+  confirmation.** The check stays in the testing engine's codebase, as
+  proposed. Full text is in CLAUDE.md's open item #3.
+- **2026-07-22 (Ibrahim's session) — confirmed yes on open item #3
+  independently**, reached before seeing the entry above, landing on the
+  same resolution — no actual conflict, just two sessions answering the
+  same question in parallel. Also gave initial direction, then a concrete
+  schema, on the content-model shape requested in "Handoff to Ibrahim's
+  track." Full text is in CLAUDE.md's "Handoff to testing-engine track"
+  section.
 
 Everything below is the original snapshot.
 

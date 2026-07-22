@@ -153,9 +153,12 @@ roleplay (T-30), deeper dashboard analytics (T-24).
        context (e.g. after being reassigned back). Whether it *should* be
        force-submitted, invalidated, or something else at the moment of
        reassignment is undecided.
-3. **PROPOSED 2026-07-22 — awaiting Ibrahim's confirmation, NOT resolved**
-   (only he can confirm this, not decided unilaterally here). Re-read the
-   actual code fresh before drafting this, not assumed:
+3. **RESOLVED 2026-07-22 — decided by Faris (project owner) directly, not
+   by Ibrahim's confirmation.** The proposal below was originally drafted
+   awaiting a yes/no from Ibrahim; the owner made the final call instead.
+   Recorded accurately: this is an owner decision, not Ibrahim having
+   agreed to it. Re-read the actual code fresh before drafting the
+   original proposal, not assumed:
 
    `isQuizUnlocked` (`src/lib/content/quiz-unlock.ts`) and
    `markLessonComplete` (`src/lib/content/lesson-completion.ts`) both live
@@ -177,18 +180,14 @@ roleplay (T-30), deeper dashboard analytics (T-24).
    against shared models, no side effects, no hidden coupling to the rest
    of the testing engine).
 
-   **Proposed resolution — short enough to forward to Ibrahim as-is for a
-   yes/no:**
-   > Proposal: the lesson-complete → quiz-unlock check (`isQuizUnlocked` /
-   > `markLessonComplete`) formally stays in the testing engine's
-   > codebase — it's already built, tested, and working there. What counts
-   > as "lesson complete" may evolve as your content system matures (e.g.
-   > an auto-derived signal instead of today's manual button), but that's
-   > a future integration point to coordinate on when it happens, not a
-   > reason to move the check itself now. OK to proceed on this basis?
+   **Resolution:** `isQuizUnlocked`/`markLessonComplete` stay in the
+   testing engine's codebase, as proposed. Rationale, briefly: the unlock
+   check only depends on a `LessonCompletion` row existing, not on how or
+   where it's created, so it's decoupled from lesson content and cheap to
+   relocate later if that's ever needed — no reason to move it now.
 
-   No code changes implied either way — this is a documentation proposal
-   only, pending his answer.
+   No code changes were needed either way — this was a documentation
+   decision only.
 3b. T-9 ("prior required content/quizzes are complete") may mean sequential
     ordering across a sector's whole lesson sequence, not just single-lesson
     unlock. Needs confirming with the CEO before Phase 1 launch — retrofitting
