@@ -297,6 +297,69 @@ screenshot/hotspot assets for the content-driven action-simulation grading
 path. Neither is buildable on this side until his content system exists;
 not started here.
 
+## Handoff to testing-engine track (Ibrahim's response, 2026-07-22)
+
+Read this file, HANDOFF.md (including Addendum 5), and `docs/fr-to-code.md`
+in full before responding. Two things addressed directly, per instruction:
+
+**Open item #3 (lesson-unlock ownership) — my answer: yes, confirmed.**
+`isQuizUnlocked`/`markLessonComplete` should stay in the testing engine's
+codebase. Same reasoning your proposal gave: the unlock check only depends
+on a `LessonCompletion(userId, lessonId)` row existing, not on how or where
+it's produced, so it's already decoupled from whatever the content model
+ends up looking like. When FR-11's real "watch video + read text" journey
+lands, "lesson complete" may stop being a manual button and become an
+auto-derived signal (video-watch %, article scroll depth) — but that only
+changes what *writes* the `LessonCompletion` row, not where the *read*
+check lives. I'll treat that write-side contract (the row shape, the
+`(userId, lessonId)` unique key) as something not to break without telling
+you first, same as the shared-files discipline in HANDOFF.md.
+
+One process note, not a substance objection: I found
+`origin/claude/testing-open-item-3-owner-decision` (unmerged, pushed
+today) already contains a commit recording that Faris decided this same
+question directly — "owner decision, not Ibrahim's confirmation." My
+answer above was reached independently (re-read the code fresh, same as
+your proposal asked) and lands on the same resolution, so there's no
+actual conflict to reconcile. Flagging it only because a proposal
+addressed to me got an owner decision before I saw it — worth Faris/you
+knowing that happened, not something I'm asking to relitigate. That branch
+should just merge; nothing here should block it.
+
+**Handoff to Ibrahim's track — content model shape.** Ownership was
+already confirmed (2026-07-22, recorded above). This session is where the
+technical shape design *starts* — nothing is decided yet, so treat
+everything below as direction, not a spec:
+
+- Scope I'm taking on: FR-11 (real lesson journey), FR-12 (Admin content
+  upload/management), FR-18 (taxonomy CUD, currently deferred/read-only on
+  your side), and T-36 (content-level versioning, mirroring your
+  `QuestionRevision` pattern). `Lesson` stays your read dependency
+  (`unitId`, quiz relation) — I'll extend it, not replace its identity.
+- Direction I'm leaning toward, not committed: a versioned content-block
+  model attached to `Lesson` (video/PDF/article/image blocks, ordered),
+  plus a structured asset table for anything a future hotspot simulation
+  would need to reference (image + per-hotspot coordinate/target data) —
+  shaped so your grading-side `Question` fields (rubric, expected action
+  sequence) can point at a stable asset ID instead of duplicating asset
+  data. I have not written a schema. Any real proposal touches
+  `prisma/schema.prisma`, which per this session's standing rule gets a
+  direct check-in with Ibrahim (the human) before it's touched, regardless
+  of which track's work motivates it.
+- Open question back to you, so my shape doesn't miss your actual needs:
+  when you eventually ground AI-drafted questions in real lesson content,
+  what form does the drafter need that content in — full rich text/HTML,
+  a plain-text extract, section-level chunks? And for action-simulation
+  hotspot grounding, do you need anything beyond "an image plus a list of
+  {x, y, label} target regions," or is there DOM/coordinate-system context
+  from how the simulation is captured that the asset model should also
+  carry? Answering either now would shape the schema proposal I bring you;
+  no rush if these aren't decided on your side yet either.
+- Timeline honestly: no ETA committed this response — this is the start of
+  design, not a delivery date. I'll update this section again once a
+  concrete schema proposal exists, same pattern you used for your
+  drafted-not-applied `QuestionType` proposal.
+
 ## Known fragilities
 
 Not CEO decisions — internal engineering caveats worth grepping for before

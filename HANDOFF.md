@@ -308,6 +308,13 @@ placeholder home. A second build run closed that:
 - **2026-07-22 (follow-up) — open item #3 (lesson-unlock ownership) gets a
   proposed resolution, NOT marked resolved — awaiting Ibrahim's yes/no.**
   Full proposal (forwardable as-is) is in CLAUDE.md's open item #3.
+- **2026-07-22 (Ibrahim's session) — confirmed yes on open item #3**
+  (independently of, but in agreement with, the owner decision found on
+  unmerged branch `claude/testing-open-item-3-owner-decision`) and gave
+  initial direction on the content-model shape requested in "Handoff to
+  Ibrahim's track." Full text is in CLAUDE.md's new "Handoff to
+  testing-engine track" section — design is starting, not finished; no
+  schema written yet.
 
 Everything below is the original snapshot.
 
