@@ -279,6 +279,9 @@ placeholder home. A second build run closed that:
   shape. Full detail (including the downstream dependency this creates for
   content-grounding and hotspot-asset sourcing) is in CLAUDE.md's
   "Handoff to Ibrahim's track" section, not duplicated here.
+- **2026-07-22 (follow-up) — open item #3 (lesson-unlock ownership) gets a
+  proposed resolution, NOT marked resolved — awaiting Ibrahim's yes/no.**
+  Full proposal (forwardable as-is) is in CLAUDE.md's open item #3.
 
 Everything below is the original snapshot.
 

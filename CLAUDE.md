@@ -97,8 +97,42 @@ roleplay (T-30), deeper dashboard analytics (T-24).
 1. What happens after 2 failed attempts — blocked, flagged for manual
    review, or something else?
 2. Sector reassignment mid-program — does quiz progress carry over or reset?
-3. Who owns the lesson-complete → quiz-unlock check: the testing engine or
-   the content system?
+3. **PROPOSED 2026-07-22 — awaiting Ibrahim's confirmation, NOT resolved**
+   (only he can confirm this, not decided unilaterally here). Re-read the
+   actual code fresh before drafting this, not assumed:
+
+   `isQuizUnlocked` (`src/lib/content/quiz-unlock.ts`) and
+   `markLessonComplete` (`src/lib/content/lesson-completion.ts`) both live
+   in the testing engine's codebase today. What "lesson complete" means is
+   a single `LessonCompletion` row keyed by `(userId, lessonId)` — nothing
+   content-specific (no video-watch-percentage, no article-scroll state).
+   It's created by a trainee tapping a manual "mark complete" button in the
+   trainee UI (`CompleteLessonButton`), fully decoupled from whatever
+   `Lesson` actually contains. `Lesson` is still FR-12's title-only
+   placeholder, and the richer "watch video + read text" journey (FR-11)
+   that would define a real content-driven completion signal is Not
+   Started — so this data's *source* could plausibly change once Ibrahim's
+   content system builds that journey (e.g. an auto-derived signal instead
+   of today's manual button). That doesn't change where the *check* needs
+   to live, though: `isQuizUnlocked` only depends on the `LessonCompletion`
+   row existing, never on how or where it got created. Nothing about how
+   it's written would make it hard to relocate later either, if that's
+   ever needed — it's a small, self-contained read (a few Prisma queries
+   against shared models, no side effects, no hidden coupling to the rest
+   of the testing engine).
+
+   **Proposed resolution — short enough to forward to Ibrahim as-is for a
+   yes/no:**
+   > Proposal: the lesson-complete → quiz-unlock check (`isQuizUnlocked` /
+   > `markLessonComplete`) formally stays in the testing engine's
+   > codebase — it's already built, tested, and working there. What counts
+   > as "lesson complete" may evolve as your content system matures (e.g.
+   > an auto-derived signal instead of today's manual button), but that's
+   > a future integration point to coordinate on when it happens, not a
+   > reason to move the check itself now. OK to proceed on this basis?
+
+   No code changes implied either way — this is a documentation proposal
+   only, pending his answer.
 3b. T-9 ("prior required content/quizzes are complete") may mean sequential
     ordering across a sector's whole lesson sequence, not just single-lesson
     unlock. Needs confirming with the CEO before Phase 1 launch — retrofitting
