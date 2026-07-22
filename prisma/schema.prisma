@@ -47,6 +47,10 @@ model User {
   gradedAnswers     AttemptAnswer[]    @relation("AttemptAnswerGradedBy")
   certificates      Certificate[]
 
+  createdContentItems   ContentItem[]         @relation("ContentItemCreatedBy")
+  contentItemRevisions  ContentItemRevision[]
+  uploadedContentAssets ContentAsset[]
+
   attemptCapOverrides        AttemptCapOverride[] @relation("AttemptCapOverrideUser")
   grantedAttemptCapOverrides AttemptCapOverride[] @relation("AttemptCapOverrideGrantedBy")
 
@@ -56,11 +60,13 @@ model User {
   @@map("users")
 }
 
-// --- Sector-scoped content model (stub) -------------------------------
-// Ibrahim's content system owns real content authoring; this is just enough
-// structure for the testing engine to depend on (sector-scoped access,
-// lesson-complete tracking in slice 3, question tagging in slice 5).
-// Hierarchy follows NFR-10: Sector -> Sub-sector -> Skill Type (-> Unit).
+// --- Sector-scoped content model ---------------------------------------
+// Owned by Ibrahim's content track (taxonomy CUD, content authoring —
+// FR-18/FR-12). The testing engine track depends on this read-only
+// (sector-scoped access, lesson-complete tracking in slice 3, question
+// tagging in slice 5) — coordinate before changing shape, per HANDOFF.md's
+// shared-files list. Hierarchy follows NFR-10: Sector -> Sub-sector ->
+// Skill Type (-> Unit) -> Lesson (-> ContentItem, added 2026-07-22).
 
 // FR-05: top-level sectors (Services, Retail, Restaurants & Cafés, ...).
 model Sector {
@@ -116,22 +122,116 @@ model Unit {
   @@map("units")
 }
 
-// FR-12 stub: the real content item (video/PDF/article) lives in Ibrahim's
-// content system — this row is just enough for lesson-complete tracking
-// (slice 3) to key off.
+// FR-11/FR-12: a lesson's real content (video/PDF/article) lives in the
+// ordered ContentItem rows below, added 2026-07-22 (was a title-only stub
+// before this — see CLAUDE.md "Handoff to testing-engine track").
 model Lesson {
   id     String @id @default(cuid())
   title  String
   unitId String
   unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
-  completions LessonCompletion[]
-  quiz        Quiz?
+  completions  LessonCompletion[]
+  quiz         Quiz?
+  contentItems ContentItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("lessons")
+}
+
+// FR-11/FR-12: an ordered content item within a lesson (e.g. a VIDEO
+// followed by an ARTICLE, to support the "watch video + read text"
+// journey). Gated by status so an Admin can prepare content before
+// trainees see it, same pattern as Question's DRAFT gate. Storage backend
+// for uploaded assets is undecided as of 2026-07-22 (see CLAUDE.md/
+// HANDOFF.md) — ContentAsset.url is kept backend-agnostic so that choice
+// doesn't touch this model.
+enum ContentItemType {
+  VIDEO
+  PDF
+  ARTICLE
+  IMAGE
+}
+
+enum ContentItemStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model ContentItem {
+  id       String            @id @default(cuid())
+  lessonId String
+  lesson   Lesson            @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  type     ContentItemType
+  order    Int
+  status   ContentItemStatus @default(DRAFT)
+
+  // ARTICLE: body holds text/HTML directly. VIDEO/PDF/IMAGE: body is null,
+  // asset holds the uploaded file reference.
+  body    String?
+  assetId String?
+  asset   ContentAsset? @relation(fields: [assetId], references: [id])
+
+  createdById String?
+  createdBy   User?   @relation("ContentItemCreatedBy", fields: [createdById], references: [id])
+
+  revisions ContentItemRevision[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([lessonId, order])
+  @@map("content_items")
+}
+
+// T-36: append-only pre-edit snapshot, taken before each edit is applied —
+// same role QuestionRevision plays for NFR-13-style isolation, here so a
+// content edit never retroactively changes what a trainee already
+// completed against.
+model ContentItemRevision {
+  id            String      @id @default(cuid())
+  contentItemId String
+  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  type    ContentItemType
+  body    String?
+  assetId String?
+  status  ContentItemStatus
+
+  editedById String?
+  editedBy   User?   @relation(fields: [editedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("content_item_revisions")
+}
+
+// Uploaded binary (video/PDF/image). hotspots is the structured
+// target-region data a future action-simulation grading path (testing
+// engine's track) would reference — shape is provisional (a list of
+// {id, x, y, width, height, label}), populated only when an asset backs a
+// simulation, null otherwise; not yet confirmed with that track (see
+// CLAUDE.md "Handoff to testing-engine track").
+model ContentAsset {
+  id           String          @id @default(cuid())
+  type         ContentItemType
+  url          String
+  mimeType     String
+  sizeBytes    Int
+  originalName String
+
+  hotspots Json?
+
+  contentItems ContentItem[]
+
+  uploadedById String?
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("content_assets")
 }
 
 // T-7 (write half): a trainee's completion of a single lesson. This is the
@@ -370,9 +470,9 @@ model AttemptAnswer {
 // over the row's own canonical fields (src/lib/certificates/signing.ts) —
 // verifiable proof the record hasn't been tampered with since issuance.
 model Certificate {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   sectorId String
   sector   Sector @relation(fields: [sectorId], references: [id])
 
@@ -391,9 +491,9 @@ model Certificate {
 // mutation (sector reassignment); slice 4's attempt overrides and slice 5's
 // question approvals reuse this.
 model AuditLog {
-  id         String   @id @default(cuid())
+  id         String @id @default(cuid())
   actorId    String
-  actor      User     @relation(fields: [actorId], references: [id])
+  actor      User   @relation(fields: [actorId], references: [id])
   action     String
   targetType String
   targetId   String
