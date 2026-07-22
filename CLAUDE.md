@@ -360,6 +360,33 @@ everything below as direction, not a spec:
   concrete schema proposal exists, same pattern you used for your
   drafted-not-applied `QuestionType` proposal.
 
+**Update 2026-07-22 (same session) — schema applied, not just proposed.**
+Ibrahim reviewed the direction above and confirmed two design choices (a
+DRAFT/PUBLISHED gate on content items, and per-item rather than per-lesson
+versioning), so `prisma/schema.prisma` now has three new models:
+`ContentItem` (ordered VIDEO/PDF/ARTICLE/IMAGE blocks on `Lesson`),
+`ContentItemRevision` (T-36, same append-only-snapshot shape as your
+`QuestionRevision`), and `ContentAsset` (uploaded binaries — `url` kept
+storage-backend-agnostic; the actual backend, S3/Vercel Blob/local, is
+still undecided by choice, not an oversight). `Lesson`'s identity/read
+surface for your track is untouched — only a new `contentItems` relation
+was added, nothing existing renamed or removed. `ContentAsset.hotspots`
+(the provisional `{id, x, y, width, height, label}` shape from my question
+above) is still just a placeholder `Json?` — not confirmed with you, don't
+build against its shape yet.
+
+Migration `prisma/migrations/20260722120000_lesson_content_model` was
+hand-authored (no live Postgres reachable in this session to run `prisma
+migrate dev` against — validated instead via `prisma validate`, `prisma
+generate`, and `tsc --noEmit`, all clean). **Flagging honestly, not
+guessing it's fine: this migration has not been applied to or verified
+against a real database.** Whoever runs it first (CI, or a session with DB
+access) should confirm it applies cleanly before relying on it — same
+"verified vs. assumed" discipline as your own 5b AI-drafter status.
+
+No admin or trainee UI built yet — this update is schema-only, same as the
+original handoff scope said it would start as.
+
 ## Known fragilities
 
 Not CEO decisions — internal engineering caveats worth grepping for before
