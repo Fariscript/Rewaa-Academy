@@ -113,16 +113,30 @@ roleplay (T-30), deeper dashboard analytics (T-24).
    next lesson in the same chain; the existing single-lesson unlock check
    itself doesn't change.
 
-   **Implementation is NOT started.** This session investigated (not
-   guessed) the sub-questions this decision raises — where "chapter/topic
-   chain" maps onto the existing content hierarchy, how a fresh attempt
-   window interacts with the existing hard-cap-plus-override model, and
-   more — and reported findings plus a design proposal directly for
-   review. Two questions are explicitly unconfirmed and block the core
-   attempt-lifecycle work: whether the loop mechanic applies only to
-   advancement-gating quizzes or platform-wide, and whether the dashboard
-   "failed" flag persists after a later pass or clears. Do not build the
-   redo-loop/attempt-reset mechanic until those are answered.
+   **Both implementation sub-questions are now answered by the owner,
+   recorded verbatim:**
+   - **Scope: platform-wide, not gated-only.** The redo-loop applies to
+     every quiz — there is no gated-only vs. platform-wide split. To
+     complete a lesson, its quiz must be passed under the redo-loop model.
+     This replaces the old hard-cap-plus-override behavior everywhere, not
+     just at chain-ending or advancement-gating quizzes.
+   - **The dashboard must record two permanent facts, not a point-in-time
+     status:** (a) whether the trainee ever failed both attempts on a
+     given quiz, at least once, regardless of later outcome, and (b)
+     whether they eventually passed or not. This is the *bigger* of the
+     two options this session's investigation flagged — the existing
+     `FAILED_FINAL_ATTEMPT`/`failedBothAttempts` status is point-in-time
+     only and would lose the "ever failed" fact once a trainee passes, so
+     it does not satisfy this on its own; a new persistent field is
+     needed. A schema proposal for it was drafted and shared for
+     review — **not applied**, per the standing rule to stop before
+     touching `prisma/schema.prisma`.
+
+   Implementation (`markLessonComplete`'s redo-detection/fresh-attempt
+   grant, `quiz-unlock.ts`'s chain-ordering check, the automatic
+   attempt-grant mechanism) is in progress this session, gated on the
+   schema proposal above being confirmed before it's applied — see
+   `HANDOFF.md` for status.
 2. **RESOLVED 2026-07-22 — the CEO's decision, recorded here verbatim:**
    - Reassignment to a new sector starts that sector's quizzes at zero.
      Confirmed already-automatic, no new code needed: quizzes in different

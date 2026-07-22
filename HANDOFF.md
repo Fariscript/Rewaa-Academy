@@ -330,6 +330,19 @@ placeholder home. A second build run closed that:
   work right now." Item #6 (FR-26) is now OUT OF SCOPE for this track,
   assigned to Ibrahim's by the owner — see CLAUDE.md's "Handoff to
   Ibrahim's track" section. Full text for all four is in CLAUDE.md.
+- **2026-07-22 (follow-up) — both item #1/#3b implementation
+  sub-questions answered by the owner, recorded verbatim in CLAUDE.md.**
+  The redo-loop is platform-wide, not gated-only — no split. The
+  dashboard must persist two permanent facts (ever-failed-at-least-once,
+  and eventual pass/fail), not just point-in-time status — the bigger of
+  the two options this session's investigation flagged, since the
+  existing `FAILED_FINAL_ATTEMPT` status alone would lose the "ever
+  failed" fact once a trainee passes. A schema proposal for the new
+  persistent field was drafted and shared for review — **not applied**,
+  per the standing rule. Implementation of the schema-independent pieces
+  (redo-detection/fresh-attempt grant, chain-ordering unlock check) is
+  proceeding this session; work depending on the new field is held until
+  the schema is confirmed.
 
 Everything below is the original snapshot.
 
