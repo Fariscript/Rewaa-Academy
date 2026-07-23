@@ -383,6 +383,29 @@ placeholder home. A second build run closed that:
   misread back as UTC, so the auto-submit check never fires); confirmed
   it's a test-script bug, not a product one — `startAttempt`'s real
   `startedAt` write matched true UTC exactly when checked directly.
+- **2026-07-22 (Ibrahim's session, later same day) — both tracks merged,
+  demo-verified at `f7c3aca`.** Faris's redo-loop merge (`8a57fd6`) plus
+  Ibrahim's remaining admin content nav tab, merged clean, no conflicts.
+  Full combined verification (not assumed): fresh `npm install`/
+  `prisma generate`/`prisma migrate dev`, `tsc`/`eslint` clean, 41 files/
+  209 tests passing, run 3×. The one cross-track integration point
+  (chain-ordering/redo-loop against real seeded content, not ephemeral
+  test fixtures) was checked directly over real HTTP with a forged
+  trainee session against a genuine second lesson under the real seeded
+  "أول مكالمة" unit — confirmed working end-to-end, including the admin
+  dashboard showing both required permanent facts ("ناجح"/"سبق الإخفاق")
+  for that trainee. One finding flagged, not fixed (Faris's call, not
+  patched here): `QuizFailureRecord` is written lazily inside
+  `getQuizOutcome`, not eagerly at submit or by the dashboard's own
+  per-trainee loop — a trainee who fails both attempts and never triggers
+  another `getQuizOutcome` read (own result page, chain-check on a later
+  lesson) would leave the dashboard's persistent flag unset. Also found
+  and fixed in passing: a stale already-running dev server (predating
+  today's `prisma generate`) was live-crashing on
+  `prisma.quizFailureRecord.upsert` — restarted, not a code bug, dev
+  server now confirmed running clean on `next dev --webpack`. Full detail
+  is in CLAUDE.md's "Handoff to testing-engine track" section, not
+  duplicated here.
 
 Everything below is the original snapshot.
 
