@@ -10,5 +10,22 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "deny": [
+      "Bash(git push * main)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(npx prisma migrate reset*)",
+      "Bash(npx prisma db push --force-reset*)",
+      "Edit(**/signing.ts)",
+      "Edit(**/signing-config.ts)",
+      "Edit(**/instrumentation.ts)",
+      "Edit(**/auth.ts)",
+      "Edit(**/*.pem)",
+      "Edit(**/*.key)",
+      "Edit(.env)",
+      "Edit(.env.test)"
+    ]
   }
 }

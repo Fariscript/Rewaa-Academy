@@ -15,6 +15,8 @@ directly against the code on 2026-07-22, not recalled from earlier docs.
 - **Faris** (testing engine): read §1, §3, §4, §6, §8.
 - **Ibrahim** (content/LMS): read §1, §5, §6, §8.
 - **Owner/CEO**: §2 is yours — five of the eight items cost minutes.
+- **Abdullah** (new, unattended weekend agent — see §10): read §1, §3, §4
+  (including F0), §6, §8, plus §10 for the unattended-pickup scoping rules.
 - §7 is the do-not-start list. If a task isn't in §4/§5/§6 or explicitly
   unblocked by a §2 answer, it belongs in §7 — don't pick it up by accident.
 
@@ -136,6 +138,31 @@ rows). Record the result in HANDOFF.md.
 work start only after this passes.**
 
 ## 4. Faris — testing engine tasks (ready to start, no decisions pending)
+
+### F0 — Fix `scripts/smoke-e2e.ts` timezone bug (independent, safe for unattended pickup)
+
+- **Why now:** `stageRedactionAndExpiry` backdates an attempt via raw SQL
+  (`UPDATE attempts SET "startedAt"=NOW() - INTERVAL '700 seconds'`) using
+  the Postgres session's local wall-clock time. This session's Postgres
+  timezone is `Asia/Riyadh` (+03); `startedAt` is a naive `TIMESTAMP(3)`
+  column (no timezone), so the raw local time gets stored, then Prisma reads
+  it back assuming UTC — a 3-hour misinterpretation. Confirmed the real app
+  code (`src/lib/quiz/start-attempt.ts`'s `startAttempt`) is correct — its
+  `startedAt` write matched true UTC exactly (14ms diff) when checked
+  directly. Only the QA script's own test-data setup is wrong. Flagged via
+  PR #9; not yet fixed.
+- **Files:** `scripts/smoke-e2e.ts` only — no overlap with F1–F4 or any
+  content-track file.
+- **Approach:** make the backdate UTC-safe — compute the target instant in
+  JS (`new Date(Date.now() - 700_000)`) and pass it as a query parameter, or
+  use `(NOW() AT TIME ZONE 'UTC') - INTERVAL '700 seconds'` in the raw SQL,
+  whichever fits the script's existing `pg.Client` usage more cleanly.
+- **Acceptance:** `npm run smoke` against a live `next dev --webpack` server
+  — the `expiry` stage reports `PASS` (currently `FAIL expiry — expected
+  AUTO_SUBMITTED, got IN_PROGRESS`); `npx vitest run` still 209/209
+  (regression check, this script isn't part of that suite); `tsc`/`eslint`
+  clean.
+- **Size:** under an hour. No CLAUDE.md Open item touched, no schema change.
 
 ### F1 — Eager-write `QuizFailureRecord` on finalization (top priority)
 
@@ -362,3 +389,48 @@ track so the humans review one schema change, not two (see also C3).
 - Deliberately **no code changes** on this branch — the stale
   `assign-sector.ts` comment is bundled into F2/F3 instead, keeping this
   branch pure markdown.
+
+## 10. Addendum — Abdullah joining, unattended weekend run (added 2026-07-23)
+
+Abdullah is a third collaborator (own, stronger agent) running unattended
+over the weekend across both tracks. This doc stays the single
+source-of-truth for task descriptions/approach/acceptance criteria — a
+personal queue-runner file (local to each person's machine, not committed)
+should reference task IDs only (e.g. "F0", "F3") and defer here for
+substance, so no second copy of a task spec can drift out of sync with this
+one. Also read §1, §3, §4 (including F0 above), §6, §8 — same as Faris.
+
+**Unattended-pickup scoping** (decided here specifically so Abdullah's agent
+and Faris's live session never touch the same file at the same time):
+
+- **Safe for unattended pickup now:** **F0** (`scripts/smoke-e2e.ts` only)
+  and **F3** (`src/lib/admin/assign-sector.ts` comment only) — both
+  single-file, zero overlap with anything else in flight.
+- **F2 is not safe until F1 merges.** F1 and F2 both modify
+  `finalizeAttempt`/`syncExpiry` in `src/lib/quiz/attempt-lifecycle.ts` — run
+  concurrently, that's a silent-overwrite risk, not just a merge conflict.
+  Queue F2 as blocked-on-F1; flip it to available only once F1's PR is
+  merged to `main`.
+- **F1 stays human-directed (Faris, §1's morning slot) — not queued for
+  unattended pickup**, even though it's top priority. It's the most
+  structurally involved item here (extraction into `compute-outcome.ts`,
+  import-cycle avoidance, a new `failure-record.ts`), and keeping it in
+  Faris's live session keeps `attempt-lifecycle.ts` single-writer until F2
+  is safe to release.
+- **F4 excluded from any queue regardless of who picks it up** — blocked on
+  D1 (owner hasn't provided `ANTHROPIC_API_KEY` yet) and the standing
+  no-stacking rule.
+- **I1/I2/C-items untouched by this addendum** — unattended pickup on
+  Ibrahim's track is Ibrahim's call, not decided here.
+
+**Guardrails:** merged into the shared, committed `.claude/settings.json`
+(applies to every clone, not one machine) — denies `git push` to `main`,
+force-push, `prisma migrate reset` / `db push --force-reset`, and edits to
+`signing.ts`, `signing-config.ts`, `instrumentation.ts`, `auth.ts`, `*.pem`,
+`*.key`, `.env`, `.env.test`. Same rationale as this session's
+webpack/`node:crypto` incident: those files need live-server verification
+and human judgment, not unattended edits.
+
+Standing rules still apply unattended: one queue item per run; never guess
+on a CLAUDE.md Open item — log it and stop; always branch + PR; never merge
+without human review, even with green CI.

@@ -1,8 +1,37 @@
 # Handoff — Rewaa Sales Academy (Testing & Assessment Engine)
 
-Last updated: 2026-07-22 (Addendum 6 below; Addendum 5, the slices 9–15
-update, and the original snapshot beneath it are kept as-is where still
-accurate).
+Last updated: 2026-07-23 (Addendum 7 below; Addendum 6, Addendum 5, the
+slices 9–15 update, and the original snapshot beneath it are kept as-is
+where still accurate).
+
+## Addendum 7 — Abdullah joining; unattended weekend run
+
+Abdullah is a third collaborator (own, stronger agent) joining for
+unattended weekend work across both tracks. Rather than a separate plan
+doc, `docs/next-steps-2026-07-23.md` (Addendum 6) was extended in place:
+a new **F0** task (the smoke-e2e.ts timezone fix, previously just flagged
+via PR #9, now specced) and a new **§10** addendum covering what Abdullah's
+agent should read and — the part that mattered most — which tasks are
+actually safe to run unattended without colliding with Faris's own live
+session. F1 and F2 both touch `finalizeAttempt`/`syncExpiry` in
+`src/lib/quiz/attempt-lifecycle.ts`; running them concurrently would be a
+silent-overwrite risk, not just a merge conflict. Decision: F0 and F3 are
+safe for immediate unattended pickup (single-file, zero overlap); F2 is
+queued blocked-on-F1 and only flips to available once F1 merges; F1 itself
+stays human-directed (Faris, live) precisely to keep that file
+single-writer until F2 is safe; F4 stays excluded regardless (blocked on
+D1). Full reasoning in `docs/next-steps-2026-07-23.md` §10.
+
+Guardrails for the unattended agent were added to the **shared, committed**
+`.claude/settings.json` (not a personal `settings.local.json`) so they
+apply to every clone, including Abdullah's — a `permissions.deny` list
+blocking pushes to `main`, force-push, `prisma migrate reset`/
+`db push --force-reset`, and edits to the signing/instrumentation/auth/env
+files, same rationale as this session's webpack/`node:crypto` incident.
+Each person's actual queue-runner file (which task IDs are `available` vs.
+`in_progress` vs. `blocked` right now) is local to their own machine, not
+committed — `docs/next-steps-2026-07-23.md` stays the one shared source of
+truth for task substance so the two never drift apart.
 
 ## Addendum 6 — execution plan for 2026-07-23 (pointer only)
 
