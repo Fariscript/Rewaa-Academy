@@ -1,7 +1,19 @@
 # Handoff — Rewaa Sales Academy (Testing & Assessment Engine)
 
-Last updated: 2026-07-21 (Addendum 5 below; the slices 9–15 update and the
-original snapshot beneath it are kept as-is where still accurate).
+Last updated: 2026-07-22 (Addendum 6 below; Addendum 5, the slices 9–15
+update, and the original snapshot beneath it are kept as-is where still
+accurate).
+
+## Addendum 6 — execution plan for 2026-07-23 (pointer only)
+
+Both tracks merged at `f7c3aca`, docs recorded at `c81fb70` (see the merged
+handoff sections in CLAUDE.md for the full verification record). The
+detailed next-steps plan for the team — owner decision queue, the slice-5b
+unblock procedure, per-track task specs (Faris F1–F4, Ibrahim I1–I2),
+cross-track coordination items, the do-not-start list, and risks — lives at
+**`docs/next-steps-2026-07-23.md`**. This addendum is deliberately a
+pointer, not a copy; that doc also records the traceability-row corrections
+(T-9, NFR-06, T-36, FR-11, FR-14, FR-01 note) shipped on the same branch.
 
 ## Addendum 5 — main merge verification, parallel-session split, shared files
 
