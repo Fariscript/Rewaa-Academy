@@ -377,6 +377,12 @@ placeholder home. A second build run closed that:
   distinct fields (`failedBothAttempts` point-in-time,
   `everFailed` permanent) are all built and tested — 209/209 full suite,
   run 3x clean, tsc/eslint clean. Full detail in CLAUDE.md's open item #1.
+- **2026-07-22 — found, not fixed: `scripts/smoke-e2e.ts`'s expiry-stage
+  backdate is timezone-unsafe** (raw SQL `NOW() - INTERVAL` truncated to
+  local wall-clock on a non-UTC Postgres session, e.g. `Asia/Riyadh` —
+  misread back as UTC, so the auto-submit check never fires); confirmed
+  it's a test-script bug, not a product one — `startAttempt`'s real
+  `startedAt` write matched true UTC exactly when checked directly.
 - **2026-07-22 (Ibrahim's session, later same day) — both tracks merged,
   demo-verified at `f7c3aca`.** Faris's redo-loop merge (`8a57fd6`) plus
   Ibrahim's remaining admin content nav tab, merged clean, no conflicts.
