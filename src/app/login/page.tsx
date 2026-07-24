@@ -5,6 +5,15 @@ import { isStagingQuickLoginEnabled } from "@/lib/dev/staging-quick-login";
 
 // Netlify staging only — see isStagingQuickLoginEnabled for the
 // STAGING_QUICK_LOGIN_ENABLED gate and its production-context fail-safe.
+//
+// force-dynamic is required, not decorative: this page has no other
+// dynamic data dependency, so Next.js would otherwise statically prerender
+// it ONCE at build time — baking in whichever env value happened to be set
+// during that build and never re-checking it again on a live request. That
+// would silently defeat both the flag and the Netlify-production-context
+// fail-safe the moment a deploy's env changes without a full rebuild.
+export const dynamic = "force-dynamic";
+
 const SEED_USER_EMAILS = {
   admin: "admin@example.com",
   trainee: "trainee@example.com",
