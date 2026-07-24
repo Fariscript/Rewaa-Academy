@@ -265,7 +265,15 @@ async function stageRedactionAndExpiry(ctx: Ctx, lesson: { id: string; quizId: s
   ).json();
   const attemptId = start.attempt.id;
   // Backdate past the deadline → the GET below must lazily auto-submit.
-  await ctx.db.query(`UPDATE attempts SET "startedAt"=NOW() - INTERVAL '700 seconds' WHERE id=$1`, [attemptId]);
+  // "startedAt" is a naive TIMESTAMP(3) (no timezone). Plain NOW() - INTERVAL
+  // stores this Postgres session's local wall-clock (e.g. Asia/Riyadh, +03)
+  // into that naive column, which Prisma then reads back as if it were UTC —
+  // a 3-hour misinterpretation. Converting through UTC first stores the true
+  // UTC instant regardless of session timezone.
+  await ctx.db.query(
+    `UPDATE attempts SET "startedAt"=(NOW() AT TIME ZONE 'UTC') - INTERVAL '700 seconds' WHERE id=$1`,
+    [attemptId],
+  );
 
   const viewText = await (await fetch(`${BASE}/api/attempts/${attemptId}`, { headers: ctx.traineeCookie })).text();
   const view = JSON.parse(viewText);
