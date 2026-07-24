@@ -2,6 +2,7 @@
 // npm install --save-dev prisma dotenv
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
+import { resolveDatabaseUrl } from "./src/lib/env/database-url";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -10,6 +11,9 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Falls back to NETLIFY_DATABASE_URL if DATABASE_URL isn't set — see
+    // src/lib/env/database-url.ts. Relative import (not "@/"): this file is
+    // loaded by the Prisma CLI directly, outside the Next.js app bundle.
+    url: resolveDatabaseUrl(),
   },
 });
